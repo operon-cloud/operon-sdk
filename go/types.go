@@ -77,22 +77,6 @@ type ParticipantSummary struct {
 }
 
 // tokenRequest mirrors the JSON payload expected by the identity broker for M2M token issuance.
-type tokenRequest struct {
-	ClientID     string   `json:"client_id"`
-	ClientSecret string   `json:"client_secret"`
-	GrantType    string   `json:"grant_type"`
-	Scope        string   `json:"scope,omitempty"`
-	Audience     []string `json:"audience,omitempty"`
-}
-
-// tokenResponse represents the JSON body returned by the identity broker.
-type tokenResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int    `json:"expires_in"`
-	Scope       string `json:"scope"`
-}
-
 type transactionSubmission struct {
 	CorrelationID string    `json:"correlationId"`
 	ChannelID     string    `json:"channelId"`

@@ -11,10 +11,28 @@ focuses on two core capabilities:
 > **Status:** Preview – APIs are subject to change while the platform’s public
 > surface stabilises. Please pin explicit versions and share feedback.
 
+## Architecture Overview
+
+The SDK is intentionally modular so that transport, authentication, and domain
+expansions can evolve independently:
+
+- `operon`: public entry point exposing `Client`, domain models, and helpers.
+- `internal/auth`: client-credential token minting with proactive refresh and
+  participant DID extraction.
+- `internal/catalog`: thread-safe caches for interactions and participants.
+- `internal/httpx`: minimal HTTP utility helpers to keep the transport swappable.
+- `internal/signing`: pluggable self-signing implementation with a disabled
+  variant when callers supply their own signatures.
+- `version`: exposes the SDK semantic version via `version.String()`, which can
+  be overridden at build time with Go ldflags for CI-driven releases.
+
+This layout keeps the surface area easy to reason about while giving room for
+future features such as retries, tracing, or additional resource clients.
+
 ## Installation
 
 ```bash
-go get github.com/trustoperon/operon-sdk/go
+go get github.com/operonmaster/operon-sdk/go@v1.0.0
 ```
 
 ## Quick Start
@@ -29,13 +47,15 @@ import (
     "os"
     "time"
 
-    operon "github.com/trustoperon/operon-sdk/go"
+    operon "github.com/operonmaster/operon-sdk/go"
+    "github.com/operonmaster/operon-sdk/go/version"
 )
 
 func main() {
     client, err := operon.NewClient(operon.Config{
-        ClientID:     mustEnv("OPERON_CLIENT_ID"),
-        ClientSecret: mustEnv("OPERON_CLIENT_SECRET"),
+        ClientID:         mustEnv("OPERON_CLIENT_ID"),
+        ClientSecret:     mustEnv("OPERON_CLIENT_SECRET"),
+        SigningAlgorithm: operon.AlgorithmEd25519, // optional override
         // BaseURL and TokenURL are optional. Override if you target non-production environments:
         // BaseURL:  "https://api.dev.trustoperon.com/client-api",
         // TokenURL: "https://auth.dev.trustoperon.com/v1/session/m2m",
@@ -76,6 +96,7 @@ func main() {
     }
 
     fmt.Println("transaction ID:", txn.ID)
+    fmt.Println("sdk version:", version.String())
 }
 
 func mustEnv(key string) string {
@@ -107,6 +128,13 @@ func mustEnv(key string) string {
   warmed catalogues; the SDK returns copies so you can safely iterate or log
   them without mutating internal cache.
 - With self-signing enabled (default), the SDK calls Operon’s DID service to produce signatures and derive key IDs automatically. Set `DisableSelfSign` when providing your own signatures.
+- Override `SigningAlgorithm` if you need to request alternate signature
+  algorithms once additional options are available.
+- Inject a custom `HTTPClient` (implementing the `Do(*http.Request)` contract)
+  when you need advanced behaviours such as retries, circuit-breaking, or
+  observability instrumentation.
+- The exported `version.String()` helper reports the embedded semantic version;
+  override it during builds with `-ldflags "-X github.com/operonmaster/operon-sdk/go/version.buildVersion=v1.0.0"` to keep binaries aligned with release tags.
 
 ## Error handling
 
