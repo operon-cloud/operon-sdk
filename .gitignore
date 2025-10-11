@@ -1,0 +1,31 @@
+# Binaries
+bin/
+go/bin/
+
+# Build artifacts
+*.out
+*.exe
+*.test
+*.so
+*.dll
+*.dylib
+
+# Go module cache
+/pkg/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Coverage reports
+*.cov
+coverage.out
+
+# Logs
+*.log
+
+# Local env secrets
+.env
+.env.*
