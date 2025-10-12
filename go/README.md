@@ -57,8 +57,8 @@ func main() {
         ClientSecret:     mustEnv("OPERON_CLIENT_SECRET"),
         SigningAlgorithm: operon.AlgorithmEd25519, // optional override
         // BaseURL and TokenURL are optional. Override if you target non-production environments:
-        // BaseURL:  "https://api.dev.trustoperon.com/client-api",
-        // TokenURL: "https://auth.dev.trustoperon.com/v1/session/m2m",
+        // BaseURL:  "https://api.dev.operon.cloud/client-api",
+        // TokenURL: "https://auth.dev.operon.cloud/oauth2/token",
     })
     if err != nil {
         log.Fatalf("build client: %v", err)

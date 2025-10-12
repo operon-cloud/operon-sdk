@@ -44,8 +44,8 @@ import (
 
 func main() {
 	client, err := operon.NewClient(operon.Config{
-		BaseURL:      "https://api.dev.operon.cloud",
-		TokenURL:     "https://auth.dev.operon.cloud/oauth/token",
+		BaseURL:      "https://api.dev.operon.cloud/client-api",
+		TokenURL:     "https://auth.dev.operon.cloud/oauth2/token",
 		ClientID:     "<CLIENT_ID>",
 		ClientSecret: "<CLIENT_SECRET>",
 		HTTPTimeout:  10 * time.Second,
@@ -80,8 +80,8 @@ func main() {
 
 | Field            | Description                                              | Example                                          |
 |------------------|----------------------------------------------------------|--------------------------------------------------|
-| `BaseURL`        | Operon API base endpoint                                 | `https://api.dev.operon.cloud`                  |
-| `TokenURL`       | OAuth2 token endpoint for service account credentials    | `https://auth.dev.operon.cloud/oauth/token`     |
+| `BaseURL`        | Operon API base endpoint                                 | `https://api.dev.operon.cloud/client-api`                  |
+| `TokenURL`       | OAuth2 token endpoint for service account credentials    | `https://auth.dev.operon.cloud/oauth2/token`     |
 | `ClientID`       | Issued client identifier                                 | `m2mc-xxxxx`                                    |
 | `ClientSecret`   | One-time secret accompanying the client ID               | `super-secret-value`                            |
 | `HTTPTimeout`    | Global timeout applied to outbound HTTP calls            | `10 * time.Second`                              |
