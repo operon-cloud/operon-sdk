@@ -151,7 +151,25 @@ func (c *Client) loadReferenceData(ctx context.Context) error {
 		return err
 	}
 
-	log.Printf("[operon-sdk] fetched %d interactions and %d participants", len(interactions), len(participants))
+	if len(interactions) > 0 {
+		details := make([]string, 0, len(interactions))
+		for _, item := range interactions {
+			details = append(details, fmt.Sprintf("%s(channel=%s, sourceParticipant=%s, targetParticipant=%s)", item.ID, item.ChannelID, item.SourceParticipantID, item.TargetParticipantID))
+		}
+		log.Printf("[operon-sdk] fetched %d interactions: %s", len(interactions), strings.Join(details, "; "))
+	} else {
+		log.Printf("[operon-sdk] fetched 0 interactions")
+	}
+
+	if len(participants) > 0 {
+		details := make([]string, 0, len(participants))
+		for _, item := range participants {
+			details = append(details, fmt.Sprintf("%s(%s)", item.ID, item.DID))
+		}
+		log.Printf("[operon-sdk] fetched %d participants: %s", len(participants), strings.Join(details, "; "))
+	} else {
+		log.Printf("[operon-sdk] fetched 0 participants")
+	}
 	dids := make(map[string]string, len(participants))
 	for _, p := range participants {
 		if p.ID != "" && p.DID != "" {
