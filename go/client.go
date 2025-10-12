@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/operonmaster/operon-sdk/go/internal/auth"
-	"github.com/operonmaster/operon-sdk/go/internal/catalog"
-	"github.com/operonmaster/operon-sdk/go/internal/signing"
+	"github.com/operon-cloud/operon-sdk/go/internal/auth"
+	"github.com/operon-cloud/operon-sdk/go/internal/catalog"
+	"github.com/operon-cloud/operon-sdk/go/internal/signing"
 )
 
 // HTTPClient captures the subset of http.Client behaviour consumed by the SDK.

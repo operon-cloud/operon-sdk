@@ -7,8 +7,8 @@ import (
     "net/http"
     "strings"
 
-    "github.com/operonmaster/operon-sdk/go/internal/apierrors"
-    "github.com/operonmaster/operon-sdk/go/internal/catalog"
+	"github.com/operon-cloud/operon-sdk/go/internal/apierrors"
+	"github.com/operon-cloud/operon-sdk/go/internal/catalog"
 )
 
 // Interactions returns the cached interaction catalogue. It performs lazy

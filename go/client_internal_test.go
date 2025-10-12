@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/operonmaster/operon-sdk/go/internal/catalog"
+	"github.com/operon-cloud/operon-sdk/go/internal/catalog"
 )
 
 func TestClientCachedParticipantDID(t *testing.T) {

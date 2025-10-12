@@ -3,7 +3,7 @@ package operon
 import (
 	"net/http"
 
-	"github.com/operonmaster/operon-sdk/go/internal/apierrors"
+	"github.com/operon-cloud/operon-sdk/go/internal/apierrors"
 )
 
 // APIError represents a structured error returned by the Operon platform.

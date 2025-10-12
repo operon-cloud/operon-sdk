@@ -1,4 +1,4 @@
-module github.com/operonmaster/operon-sdk/go
+module github.com/operon-cloud/operon-sdk/go
 
 go 1.25.1
 

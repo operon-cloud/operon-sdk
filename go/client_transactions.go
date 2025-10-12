@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/operonmaster/operon-sdk/go/internal/apierrors"
-	"github.com/operonmaster/operon-sdk/go/internal/httpx"
-	"github.com/operonmaster/operon-sdk/go/internal/signing"
+	"github.com/operon-cloud/operon-sdk/go/internal/apierrors"
+	"github.com/operon-cloud/operon-sdk/go/internal/httpx"
+	"github.com/operon-cloud/operon-sdk/go/internal/signing"
 )
 
 // SubmitTransaction submits a transaction payload to the Operon client API and returns the persisted record.

@@ -5,7 +5,7 @@ import (
     "fmt"
     "net/http"
 
-    "github.com/operonmaster/operon-sdk/go/internal/httpx"
+	"github.com/operon-cloud/operon-sdk/go/internal/httpx"
 )
 
 func (c *Client) authorizedJSONRequest(ctx context.Context, method, path, token string, payload any) (*http.Response, error) {

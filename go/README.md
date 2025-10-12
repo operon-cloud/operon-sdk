@@ -32,7 +32,7 @@ future features such as retries, tracing, or additional resource clients.
 ## Installation
 
 ```bash
-go get github.com/operonmaster/operon-sdk/go@v1.0.0
+go get github.com/operon-cloud/operon-sdk/go@v1.0.0
 ```
 
 ## Quick Start
@@ -47,8 +47,8 @@ import (
     "os"
     "time"
 
-    operon "github.com/operonmaster/operon-sdk/go"
-    "github.com/operonmaster/operon-sdk/go/version"
+    operon "github.com/operon-cloud/operon-sdk/go"
+    "github.com/operon-cloud/operon-sdk/go/version"
 )
 
 func main() {
@@ -134,7 +134,7 @@ func mustEnv(key string) string {
   when you need advanced behaviours such as retries, circuit-breaking, or
   observability instrumentation.
 - The exported `version.String()` helper reports the embedded semantic version;
-  override it during builds with `-ldflags "-X github.com/operonmaster/operon-sdk/go/version.buildVersion=v1.0.0"` to keep binaries aligned with release tags.
+  override it during builds with `-ldflags "-X github.com/operon-cloud/operon-sdk/go/version.buildVersion=v1.0.0"` to keep binaries aligned with release tags.
 
 ## Error handling
 

@@ -7,8 +7,8 @@ import (
     "net/http"
     "strings"
 
-    "github.com/operonmaster/operon-sdk/go/internal/apierrors"
-    "github.com/operonmaster/operon-sdk/go/internal/httpx"
+	"github.com/operon-cloud/operon-sdk/go/internal/apierrors"
+	"github.com/operon-cloud/operon-sdk/go/internal/httpx"
 )
 
 // Result represents the structure returned by the signing endpoint.

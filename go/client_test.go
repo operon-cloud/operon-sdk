@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	operon "github.com/operonmaster/operon-sdk/go"
+	operon "github.com/operon-cloud/operon-sdk/go"
 )
 
 type tokenResponse struct {

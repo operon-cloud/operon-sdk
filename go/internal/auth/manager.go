@@ -11,8 +11,8 @@ import (
     "sync"
     "time"
 
-    "github.com/operonmaster/operon-sdk/go/internal/apierrors"
-    "github.com/operonmaster/operon-sdk/go/internal/httpx"
+	"github.com/operon-cloud/operon-sdk/go/internal/apierrors"
+	"github.com/operon-cloud/operon-sdk/go/internal/httpx"
 )
 
 const defaultLeeway = 30 * time.Second
