@@ -30,6 +30,9 @@ type Client struct {
 	initOnce sync.Once
 	initErr  error
 
+	referenceMu     sync.Mutex
+	referenceLoaded bool
+
 	participantMu  sync.RWMutex
 	participantDID string
 }
@@ -91,7 +94,6 @@ func (c *Client) Init(ctx context.Context) error {
 			c.initErr = err
 			return
 		}
-		c.initErr = c.loadReferenceData(ctx)
 	})
 	return c.initErr
 }

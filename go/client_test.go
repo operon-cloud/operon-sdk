@@ -307,7 +307,7 @@ func TestClientParticipantsReturnsCopy(t *testing.T) {
 	require.True(t, sourceRestored)
 }
 
-func TestClientInitFailsWhenParticipantsFail(t *testing.T) {
+func TestReferenceFetchFailsWhenParticipantsFail(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
@@ -339,7 +339,9 @@ func TestClientInitFailsWhenParticipantsFail(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	err := client.Init(ctx)
+	require.NoError(t, client.Init(ctx))
+
+	_, err := client.Participants(ctx)
 	require.Error(t, err)
 }
 
@@ -448,7 +450,7 @@ func TestSubmitTransactionValidatesInput(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestClientInitFailsWhenInteractionDecodeFails(t *testing.T) {
+func TestReferenceFetchFailsWhenInteractionDecodeFails(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
@@ -467,11 +469,12 @@ func TestClientInitFailsWhenInteractionDecodeFails(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	err := client.Init(ctx)
+	require.NoError(t, client.Init(ctx))
+	_, err := client.Interactions(ctx)
 	require.Error(t, err)
 }
 
-func TestClientInitFailsWhenParticipantDecodeFails(t *testing.T) {
+func TestReferenceFetchFailsWhenParticipantDecodeFails(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
@@ -502,11 +505,12 @@ func TestClientInitFailsWhenParticipantDecodeFails(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	err := client.Init(ctx)
+	require.NoError(t, client.Init(ctx))
+	_, err := client.Participants(ctx)
 	require.Error(t, err)
 }
 
-func TestClientInitFailsWhenInteractionsFail(t *testing.T) {
+func TestReferenceFetchFailsWhenInteractionsFail(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
@@ -526,6 +530,7 @@ func TestClientInitFailsWhenInteractionsFail(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	err := client.Init(ctx)
+	require.NoError(t, client.Init(ctx))
+	_, err := client.Interactions(ctx)
 	require.Error(t, err)
 }
