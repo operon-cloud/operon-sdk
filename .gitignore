@@ -1,31 +1,17 @@
-# Binaries
-bin/
-go/bin/
-
-# Build artifacts
-*.out
-*.exe
-*.test
-*.so
-*.dll
-*.dylib
-
-# Go module cache
-/pkg/
-
-# IDE / Editor
+# OS / Editor junk
+.DS_Store
+*.swp
 .vscode/
 .idea/
-*.swp
-.DS_Store
 
-# Coverage reports
-*.cov
-coverage.out
-
-# Logs
+# Generic build artifacts
+bin/
+*.out
+*.exe
+*.dll
+*.dylib
 *.log
 
-# Local env secrets
+# Environment files
 .env
 .env.*
