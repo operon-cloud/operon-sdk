@@ -1,15 +1,16 @@
 package auth
 
 import (
-    "context"
-    "encoding/base64"
-    "encoding/json"
-    "errors"
-    "fmt"
-    "net/http"
-    "strings"
-    "sync"
-    "time"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/operon-cloud/operon-sdk/go/internal/apierrors"
 	"github.com/operon-cloud/operon-sdk/go/internal/httpx"
@@ -20,182 +21,221 @@ const defaultLeeway = 30 * time.Second
 // Token captures an access token together with the derived participant DID (if
 // available) and expiry metadata for proactive refresh decisions.
 type Token struct {
-    AccessToken   string
-    ParticipantDID string
-    Expiry        time.Time
+	AccessToken    string
+	ParticipantDID string
+	Expiry         time.Time
 }
 
 // Provider exposes the contract for retrieving access tokens.
 type Provider interface {
-    Token(ctx context.Context) (Token, error)
+	Token(ctx context.Context) (Token, error)
 }
 
 // ClientCredentialsConfig defines the inputs required to mint tokens using the
 // OAuth client credentials grant.
 type ClientCredentialsConfig struct {
-    TokenURL     string
-    ClientID     string
-    ClientSecret string
-    Scope        string
-    Audience     []string
-    HTTPClient   httpx.Doer
-    Leeway       time.Duration
+	TokenURL     string
+	ClientID     string
+	ClientSecret string
+	Scope        string
+	Audience     []string
+	HTTPClient   httpx.Doer
+	Leeway       time.Duration
 }
 
 // ClientCredentialsManager implements Provider by minting and caching client
 // credential tokens via the Operon identity broker.
 type ClientCredentialsManager struct {
-    tokenURL string
-    body     tokenRequest
-    http     httpx.Doer
-    leeway   time.Duration
+	tokenURL string
+	body     tokenRequest
+	clientID string
+	secret   string
+	scope    string
+	audience []string
+	http     httpx.Doer
+	leeway   time.Duration
+	legacy   bool
 
-    mu     sync.Mutex
-    cached *Token
+	mu     sync.Mutex
+	cached *Token
 }
 
 // NewClientCredentialsManager builds a Provider that caches access tokens and
 // refreshes them proactively before expiry.
 func NewClientCredentialsManager(cfg ClientCredentialsConfig) (*ClientCredentialsManager, error) {
-    if cfg.HTTPClient == nil {
-        return nil, errors.New("HTTPClient is required")
-    }
-    if strings.TrimSpace(cfg.TokenURL) == "" {
-        return nil, errors.New("TokenURL is required")
-    }
-    if strings.TrimSpace(cfg.ClientID) == "" {
-        return nil, errors.New("ClientID is required")
-    }
-    if strings.TrimSpace(cfg.ClientSecret) == "" {
-        return nil, errors.New("ClientSecret is required")
-    }
+	if cfg.HTTPClient == nil {
+		return nil, errors.New("HTTPClient is required")
+	}
+	if strings.TrimSpace(cfg.TokenURL) == "" {
+		return nil, errors.New("TokenURL is required")
+	}
+	if strings.TrimSpace(cfg.ClientID) == "" {
+		return nil, errors.New("ClientID is required")
+	}
+	if strings.TrimSpace(cfg.ClientSecret) == "" {
+		return nil, errors.New("ClientSecret is required")
+	}
 
-    leeway := cfg.Leeway
-    if leeway <= 0 {
-        leeway = defaultLeeway
-    }
+	leeway := cfg.Leeway
+	if leeway <= 0 {
+		leeway = defaultLeeway
+	}
 
-    manager := &ClientCredentialsManager{
-        tokenURL: strings.TrimRight(cfg.TokenURL, "/"),
-        body: tokenRequest{
-            ClientID:     cfg.ClientID,
-            ClientSecret: cfg.ClientSecret,
-            GrantType:    "client_credentials",
-            Scope:        cfg.Scope,
-            Audience:     cfg.Audience,
-        },
-        http:   cfg.HTTPClient,
-        leeway: leeway,
-    }
-    return manager, nil
+	tokenURL := strings.TrimRight(cfg.TokenURL, "/")
+	legacy := strings.Contains(tokenURL, "/v1/session/m2m")
+
+	manager := &ClientCredentialsManager{
+		tokenURL: tokenURL,
+		body: tokenRequest{
+			ClientID:     cfg.ClientID,
+			ClientSecret: cfg.ClientSecret,
+			GrantType:    "client_credentials",
+			Scope:        cfg.Scope,
+			Audience:     cfg.Audience,
+		},
+		clientID: cfg.ClientID,
+		secret:   cfg.ClientSecret,
+		scope:    strings.TrimSpace(cfg.Scope),
+		audience: cfg.Audience,
+		http:     cfg.HTTPClient,
+		leeway:   leeway,
+		legacy:   legacy,
+	}
+	return manager, nil
 }
 
 // Token returns a cached access token, refreshing it as needed using the
 // configured OAuth credentials.
 func (m *ClientCredentialsManager) Token(ctx context.Context) (Token, error) {
-    m.mu.Lock()
-    if m.cached != nil && time.Until(m.cached.Expiry) > m.leeway {
-        token := *m.cached
-        m.mu.Unlock()
-        return token, nil
-    }
-    m.mu.Unlock()
+	m.mu.Lock()
+	if m.cached != nil && time.Until(m.cached.Expiry) > m.leeway {
+		token := *m.cached
+		m.mu.Unlock()
+		return token, nil
+	}
+	m.mu.Unlock()
 
-    fresh, err := m.fetchToken(ctx)
-    if err != nil {
-        return Token{}, err
-    }
+	fresh, err := m.fetchToken(ctx)
+	if err != nil {
+		return Token{}, err
+	}
 
-    m.mu.Lock()
-    m.cached = &fresh
-    m.mu.Unlock()
-    return fresh, nil
+	m.mu.Lock()
+	m.cached = &fresh
+	m.mu.Unlock()
+	return fresh, nil
 }
 
 func (m *ClientCredentialsManager) fetchToken(ctx context.Context) (Token, error) {
-    req, err := httpx.NewJSONRequest(ctx, http.MethodPost, m.tokenURL, m.body)
-    if err != nil {
-        return Token{}, fmt.Errorf("build token request: %w", err)
-    }
-    req.Header.Set("Content-Type", "application/json")
+	var (
+		req *http.Request
+		err error
+	)
 
-    resp, err := m.http.Do(req)
-    if err != nil {
-        return Token{}, fmt.Errorf("request token: %w", err)
-    }
-    defer resp.Body.Close()
+	if m.legacy {
+		req, err = httpx.NewJSONRequest(ctx, http.MethodPost, m.tokenURL, m.body)
+		if err != nil {
+			return Token{}, fmt.Errorf("build token request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+	} else {
+		form := url.Values{}
+		form.Set("grant_type", "client_credentials")
+		if m.scope != "" {
+			form.Set("scope", m.scope)
+		}
+		for _, aud := range m.audience {
+			if trimmed := strings.TrimSpace(aud); trimmed != "" {
+				form.Add("audience", trimmed)
+			}
+		}
 
-    if resp.StatusCode >= http.StatusBadRequest {
-        apiErr, decodeErr := apierrors.Decode(resp)
-        if decodeErr != nil {
-            return Token{}, decodeErr
-        }
-        return Token{}, apiErr
-    }
+		req, err = http.NewRequestWithContext(ctx, http.MethodPost, m.tokenURL, strings.NewReader(form.Encode()))
+		if err != nil {
+			return Token{}, fmt.Errorf("build token request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		credentials := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", m.clientID, m.secret)))
+		req.Header.Set("Authorization", "Basic "+credentials)
+	}
 
-    var payload tokenResponse
-    if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-        return Token{}, fmt.Errorf("decode token response: %w", err)
-    }
+	resp, err := m.http.Do(req)
+	if err != nil {
+		return Token{}, fmt.Errorf("request token: %w", err)
+	}
+	defer resp.Body.Close()
 
-    accessToken := strings.TrimSpace(payload.AccessToken)
-    if accessToken == "" {
-        return Token{}, errors.New("token response missing access_token")
-    }
+	if resp.StatusCode >= http.StatusBadRequest {
+		apiErr, decodeErr := apierrors.Decode(resp)
+		if decodeErr != nil {
+			return Token{}, decodeErr
+		}
+		return Token{}, apiErr
+	}
 
-    expiresIn := time.Duration(payload.ExpiresIn) * time.Second
-    if expiresIn <= 0 {
-        expiresIn = time.Minute
-    }
+	var payload tokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return Token{}, fmt.Errorf("decode token response: %w", err)
+	}
 
-    token := Token{
-        AccessToken:   accessToken,
-        ParticipantDID: extractParticipantDID(accessToken),
-        Expiry:        time.Now().Add(expiresIn),
-    }
-    return token, nil
+	accessToken := strings.TrimSpace(payload.AccessToken)
+	if accessToken == "" {
+		return Token{}, errors.New("token response missing access_token")
+	}
+
+	expiresIn := time.Duration(payload.ExpiresIn) * time.Second
+	if expiresIn <= 0 {
+		expiresIn = time.Minute
+	}
+
+	token := Token{
+		AccessToken:    accessToken,
+		ParticipantDID: extractParticipantDID(accessToken),
+		Expiry:         time.Now().Add(expiresIn),
+	}
+	return token, nil
 }
 
 // tokenRequest mirrors the JSON payload expected by the identity broker for M2M token issuance.
 type tokenRequest struct {
-    ClientID     string   `json:"client_id"`
-    ClientSecret string   `json:"client_secret"`
-    GrantType    string   `json:"grant_type"`
-    Scope        string   `json:"scope,omitempty"`
-    Audience     []string `json:"audience,omitempty"`
+	ClientID     string   `json:"client_id"`
+	ClientSecret string   `json:"client_secret"`
+	GrantType    string   `json:"grant_type"`
+	Scope        string   `json:"scope,omitempty"`
+	Audience     []string `json:"audience,omitempty"`
 }
 
 // tokenResponse represents the JSON body returned by the identity broker.
 type tokenResponse struct {
-    AccessToken string `json:"access_token"`
-    TokenType   string `json:"token_type"`
-    ExpiresIn   int    `json:"expires_in"`
-    Scope       string `json:"scope"`
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+	Scope       string `json:"scope"`
 }
 
 func extractParticipantDID(token string) string {
-    parts := strings.Split(token, ".")
-    if len(parts) < 2 {
-        return ""
-    }
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
+		return ""
+	}
 
-    decode := func(seg string) ([]byte, error) {
-        if b, err := base64.RawURLEncoding.DecodeString(seg); err == nil {
-            return b, nil
-        }
-        return base64.StdEncoding.DecodeString(seg)
-    }
+	decode := func(seg string) ([]byte, error) {
+		if b, err := base64.RawURLEncoding.DecodeString(seg); err == nil {
+			return b, nil
+		}
+		return base64.StdEncoding.DecodeString(seg)
+	}
 
-    payload, err := decode(parts[1])
-    if err != nil {
-        return ""
-    }
+	payload, err := decode(parts[1])
+	if err != nil {
+		return ""
+	}
 
-    var claims struct {
-        ParticipantDID string `json:"participant_did"`
-    }
-    if err := json.Unmarshal(payload, &claims); err != nil {
-        return ""
-    }
-    return claims.ParticipantDID
+	var claims struct {
+		ParticipantDID string `json:"participant_did"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return ""
+	}
+	return claims.ParticipantDID
 }

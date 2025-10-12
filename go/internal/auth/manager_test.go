@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 type mockDoer struct {
 	responses []*http.Response
+	requests  []*http.Request
 	calls     int
 }
 
@@ -20,6 +22,7 @@ func (m *mockDoer) Do(req *http.Request) (*http.Response, error) {
 	if m.calls >= len(m.responses) {
 		return nil, io.EOF
 	}
+	m.requests = append(m.requests, req)
 	resp := m.responses[m.calls]
 	m.calls++
 	return resp, nil
@@ -52,6 +55,15 @@ func TestClientCredentialsManagerCachesTokens(t *testing.T) {
 	require.Equal(t, "header.eyJwYXJ0aWNpcGFudF9kaWQiOiAiZGlkOmV4YW1wbGU6c291cmNlIn0.signature", token.AccessToken)
 	require.Equal(t, "did:example:source", token.ParticipantDID)
 
+	require.Len(t, mock.requests, 1)
+	req := mock.requests[0]
+	require.Equal(t, "application/x-www-form-urlencoded", req.Header.Get("Content-Type"))
+	require.Equal(t, "Basic "+base64.StdEncoding.EncodeToString([]byte("client:secret")), req.Header.Get("Authorization"))
+	bodyBytes, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+	_ = req.Body.Close()
+	require.Contains(t, string(bodyBytes), "grant_type=client_credentials")
+
 	token2, err := manager.Token(ctx)
 	require.NoError(t, err)
 	require.Equal(t, token.AccessToken, token2.AccessToken)
@@ -83,4 +95,28 @@ func TestNewClientCredentialsManagerValidation(t *testing.T) {
 
 func TestExtractParticipantDIDHandlesInvalidToken(t *testing.T) {
 	require.Equal(t, "", extractParticipantDID("invalid"))
+}
+
+func TestClientCredentialsManagerLegacyBrokerPayload(t *testing.T) {
+	body := `{"access_token":"token","token_type":"Bearer","expires_in":3600}`
+	mock := &mockDoer{responses: []*http.Response{newResponse(http.StatusOK, body)}}
+
+	manager, err := NewClientCredentialsManager(ClientCredentialsConfig{
+		TokenURL:     "https://identity.local/v1/session/m2m",
+		ClientID:     "client",
+		ClientSecret: "secret",
+		HTTPClient:   mock,
+	})
+	require.NoError(t, err)
+
+	_, err = manager.Token(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, mock.requests, 1)
+	req := mock.requests[0]
+	require.Equal(t, "application/json", req.Header.Get("Content-Type"))
+	bodyBytes, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+	_ = req.Body.Close()
+	require.Contains(t, string(bodyBytes), "\"client_id\":\"client\"")
 }
