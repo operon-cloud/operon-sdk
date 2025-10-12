@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -61,9 +62,11 @@ func (c *Client) ensureReferenceData(ctx context.Context) error {
 	c.referenceMu.Unlock()
 
 	if loaded {
+		log.Printf("[operon-sdk] reference data already loaded (cached)")
 		return nil
 	}
 
+	log.Printf("[operon-sdk] reference data cache empty, reloading")
 	return c.reloadReferenceData(ctx)
 }
 
@@ -71,10 +74,13 @@ func (c *Client) reloadReferenceData(ctx context.Context) error {
 	c.referenceMu.Lock()
 	defer c.referenceMu.Unlock()
 
+	log.Printf("[operon-sdk] refreshing reference data cache")
 	if err := c.loadReferenceData(ctx); err != nil {
+		log.Printf("[operon-sdk] failed to load reference data: %v", err)
 		return err
 	}
 	c.referenceLoaded = true
+	log.Printf("[operon-sdk] reference data cache populated")
 	return nil
 }
 
@@ -90,15 +96,18 @@ func (c *Client) populateInteractionFields(ctx context.Context, req *Transaction
 
 	meta, ok := c.registry.Interaction(strings.TrimSpace(req.InteractionID))
 	if !ok {
+		log.Printf("[operon-sdk] interaction %s not found in cache; triggering reload", req.InteractionID)
 		if err := c.reloadReferenceData(ctx); err != nil {
 			return fmt.Errorf("refresh interaction cache: %w", err)
 		}
 		meta, ok = c.registry.Interaction(strings.TrimSpace(req.InteractionID))
 		if !ok {
+			log.Printf("[operon-sdk] interaction %s still missing after cache refresh", req.InteractionID)
 			return fmt.Errorf("interaction %s not found", req.InteractionID)
 		}
 	}
 
+	log.Printf("[operon-sdk] resolving interaction %s (channel %s, sourceParticipant %s, targetParticipant %s)", req.InteractionID, meta.ChannelID, meta.SourceParticipantID, meta.TargetParticipantID)
 	if strings.TrimSpace(req.ChannelID) == "" {
 		req.ChannelID = meta.ChannelID
 	}
@@ -132,14 +141,17 @@ func (c *Client) loadReferenceData(ctx context.Context) error {
 
 	interactions, err := c.fetchInteractions(ctx, token)
 	if err != nil {
+		log.Printf("[operon-sdk] fetchInteractions failed: %v", err)
 		return err
 	}
 
 	participants, err := c.fetchParticipants(ctx, token)
 	if err != nil {
+		log.Printf("[operon-sdk] fetchParticipants failed: %v", err)
 		return err
 	}
 
+	log.Printf("[operon-sdk] fetched %d interactions and %d participants", len(interactions), len(participants))
 	dids := make(map[string]string, len(participants))
 	for _, p := range participants {
 		if p.ID != "" && p.DID != "" {
@@ -158,11 +170,13 @@ func (c *Client) loadReferenceData(ctx context.Context) error {
 
 	c.registry.ReplaceInteractions(interactions)
 	c.registry.ReplaceParticipants(participants)
+	log.Printf("[operon-sdk] registry populated with %d interactions, %d participants", len(interactions), len(participants))
 
 	return nil
 }
 
 func (c *Client) fetchInteractions(ctx context.Context, token string) ([]catalog.Interaction, error) {
+	log.Printf("[operon-sdk] requesting /v1/interactions")
 	resp, err := c.authorizedJSONRequest(ctx, http.MethodGet, "/v1/interactions", token, nil)
 	if err != nil {
 		return nil, err
@@ -170,6 +184,7 @@ func (c *Client) fetchInteractions(ctx context.Context, token string) ([]catalog
 	defer closeSilently(resp)
 
 	if resp.StatusCode >= http.StatusBadRequest {
+		log.Printf("[operon-sdk] /v1/interactions returned status %d", resp.StatusCode)
 		apiErr, decodeErr := apierrors.Decode(resp)
 		if decodeErr != nil {
 			return nil, decodeErr
@@ -190,6 +205,7 @@ func (c *Client) fetchInteractions(ctx context.Context, token string) ([]catalog
 		return nil, fmt.Errorf("decode interactions response: %w", err)
 	}
 
+	log.Printf("[operon-sdk] /v1/interactions returned %d records", len(payload.Data))
 	result := make([]catalog.Interaction, 0, len(payload.Data))
 	for _, item := range payload.Data {
 		result = append(result, catalog.Interaction{
@@ -203,6 +219,7 @@ func (c *Client) fetchInteractions(ctx context.Context, token string) ([]catalog
 }
 
 func (c *Client) fetchParticipants(ctx context.Context, token string) ([]catalog.Participant, error) {
+	log.Printf("[operon-sdk] requesting /v1/participants")
 	resp, err := c.authorizedJSONRequest(ctx, http.MethodGet, "/v1/participants", token, nil)
 	if err != nil {
 		return nil, err
@@ -210,6 +227,7 @@ func (c *Client) fetchParticipants(ctx context.Context, token string) ([]catalog
 	defer closeSilently(resp)
 
 	if resp.StatusCode >= http.StatusBadRequest {
+		log.Printf("[operon-sdk] /v1/participants returned status %d", resp.StatusCode)
 		apiErr, decodeErr := apierrors.Decode(resp)
 		if decodeErr != nil {
 			return nil, decodeErr
@@ -228,6 +246,7 @@ func (c *Client) fetchParticipants(ctx context.Context, token string) ([]catalog
 		return nil, fmt.Errorf("decode participants response: %w", err)
 	}
 
+	log.Printf("[operon-sdk] /v1/participants returned %d records", len(payload.Data))
 	result := make([]catalog.Participant, 0, len(payload.Data))
 	for _, item := range payload.Data {
 		if item.ID == "" || item.DID == "" {
