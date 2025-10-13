@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -36,7 +37,9 @@ func newResponse(status int, body string) *http.Response {
 }
 
 func TestClientCredentialsManagerCachesTokens(t *testing.T) {
-	body := `{"access_token":"header.eyJwYXJ0aWNpcGFudF9kaWQiOiAiZGlkOmV4YW1wbGU6c291cmNlIn0.signature","token_type":"Bearer","expires_in":3600}`
+	claims := `{"participant_did":"did:example:source","channel_id":"chnl-123","customer_id":"cust-456","workspace_id":"wksp-789","email":"user@example.com","name":"Example User","tenant_ids":["tenant-1","tenant-2"],"roles":["role-admin"],"member_id":"member-1","session_id":"session-1","org_id":"org-1"}`
+	payload := base64.RawURLEncoding.EncodeToString([]byte(claims))
+	body := fmt.Sprintf(`{"access_token":"header.%s.signature","token_type":"Bearer","expires_in":3600}`, payload)
 	mock := &mockDoer{responses: []*http.Response{newResponse(http.StatusOK, body)}}
 
 	manager, err := NewClientCredentialsManager(ClientCredentialsConfig{
@@ -52,8 +55,18 @@ func TestClientCredentialsManagerCachesTokens(t *testing.T) {
 
 	token, err := manager.Token(ctx)
 	require.NoError(t, err)
-	require.Equal(t, "header.eyJwYXJ0aWNpcGFudF9kaWQiOiAiZGlkOmV4YW1wbGU6c291cmNlIn0.signature", token.AccessToken)
+	require.Equal(t, fmt.Sprintf("header.%s.signature", payload), token.AccessToken)
 	require.Equal(t, "did:example:source", token.ParticipantDID)
+	require.Equal(t, "chnl-123", token.ChannelID)
+	require.Equal(t, "cust-456", token.CustomerID)
+	require.Equal(t, "wksp-789", token.WorkspaceID)
+	require.Equal(t, "user@example.com", token.Email)
+	require.Equal(t, "Example User", token.Name)
+	require.Equal(t, []string{"tenant-1", "tenant-2"}, token.TenantIDs)
+	require.Equal(t, []string{"role-admin"}, token.Roles)
+	require.Equal(t, "member-1", token.MemberID)
+	require.Equal(t, "session-1", token.SessionID)
+	require.Equal(t, "org-1", token.OrgID)
 
 	require.Len(t, mock.requests, 1)
 	req := mock.requests[0]

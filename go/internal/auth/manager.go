@@ -23,6 +23,16 @@ const defaultLeeway = 30 * time.Second
 type Token struct {
 	AccessToken    string
 	ParticipantDID string
+	ChannelID      string
+	CustomerID     string
+	WorkspaceID    string
+	Email          string
+	Name           string
+	TenantIDs      []string
+	Roles          []string
+	MemberID       string
+	SessionID      string
+	OrgID          string
 	Expiry         time.Time
 }
 
@@ -188,9 +198,21 @@ func (m *ClientCredentialsManager) fetchToken(ctx context.Context) (Token, error
 		expiresIn = time.Minute
 	}
 
+	claims := extractTokenClaims(accessToken)
+
 	token := Token{
 		AccessToken:    accessToken,
-		ParticipantDID: extractParticipantDID(accessToken),
+		ParticipantDID: claims.ParticipantDID,
+		ChannelID:      claims.ChannelID,
+		CustomerID:     claims.CustomerID,
+		WorkspaceID:    claims.WorkspaceID,
+		Email:          claims.Email,
+		Name:           claims.Name,
+		TenantIDs:      append([]string(nil), claims.TenantIDs...),
+		Roles:          append([]string(nil), claims.Roles...),
+		MemberID:       claims.MemberID,
+		SessionID:      claims.SessionID,
+		OrgID:          claims.OrgID,
 		Expiry:         time.Now().Add(expiresIn),
 	}
 	return token, nil
@@ -214,9 +236,27 @@ type tokenResponse struct {
 }
 
 func extractParticipantDID(token string) string {
+	return extractTokenClaims(token).ParticipantDID
+}
+
+type tokenClaims struct {
+	ParticipantDID string   `json:"participant_did"`
+	ChannelID      string   `json:"channel_id"`
+	CustomerID     string   `json:"customer_id"`
+	WorkspaceID    string   `json:"workspace_id"`
+	Email          string   `json:"email"`
+	Name           string   `json:"name"`
+	TenantIDs      []string `json:"tenant_ids"`
+	Roles          []string `json:"roles"`
+	MemberID       string   `json:"member_id"`
+	SessionID      string   `json:"session_id"`
+	OrgID          string   `json:"org_id"`
+}
+
+func extractTokenClaims(token string) tokenClaims {
 	parts := strings.Split(token, ".")
 	if len(parts) < 2 {
-		return ""
+		return tokenClaims{}
 	}
 
 	decode := func(seg string) ([]byte, error) {
@@ -228,14 +268,12 @@ func extractParticipantDID(token string) string {
 
 	payload, err := decode(parts[1])
 	if err != nil {
-		return ""
+		return tokenClaims{}
 	}
 
-	var claims struct {
-		ParticipantDID string `json:"participant_did"`
-	}
+	var claims tokenClaims
 	if err := json.Unmarshal(payload, &claims); err != nil {
-		return ""
+		return tokenClaims{}
 	}
-	return claims.ParticipantDID
+	return claims
 }

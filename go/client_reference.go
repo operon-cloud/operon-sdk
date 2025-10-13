@@ -85,10 +85,22 @@ func (c *Client) reloadReferenceData(ctx context.Context) error {
 }
 
 func (c *Client) populateInteractionFields(ctx context.Context, req *TransactionRequest) error {
+	if strings.TrimSpace(req.ChannelID) == "" {
+		if channel := c.cachedChannelID(); channel != "" {
+			req.ChannelID = channel
+		}
+	}
+
 	if strings.TrimSpace(req.InteractionID) == "" {
 		if strings.TrimSpace(req.SourceDID) == "" {
 			if did := c.cachedParticipantDID(); did != "" {
 				req.SourceDID = did
+			}
+		}
+
+		if strings.TrimSpace(req.ChannelID) == "" {
+			if channel := c.cachedChannelID(); channel != "" {
+				req.ChannelID = channel
 			}
 		}
 		return nil
@@ -109,7 +121,11 @@ func (c *Client) populateInteractionFields(ctx context.Context, req *Transaction
 
 	log.Printf("[operon-sdk] resolving interaction %s (channel %s, sourceParticipant %s, targetParticipant %s)", req.InteractionID, meta.ChannelID, meta.SourceParticipantID, meta.TargetParticipantID)
 	if strings.TrimSpace(req.ChannelID) == "" {
-		req.ChannelID = meta.ChannelID
+		if meta.ChannelID != "" {
+			req.ChannelID = meta.ChannelID
+		} else if channel := c.cachedChannelID(); channel != "" {
+			req.ChannelID = channel
+		}
 	}
 	if strings.TrimSpace(req.SourceDID) == "" {
 		if meta.SourceDID == "" {

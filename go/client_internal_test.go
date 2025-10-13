@@ -47,10 +47,28 @@ func TestPopulateInteractionFieldsMissingDIDs(t *testing.T) {
 func TestPopulateInteractionFieldsUsesParticipantFallback(t *testing.T) {
 	client := &Client{registry: catalog.NewRegistry()}
 	client.participantDID = "did:example:fallback"
+	client.channelID = "chnl-fallback"
 
 	req := TransactionRequest{CorrelationID: "corr-3"}
 	require.NoError(t, client.populateInteractionFields(context.Background(), &req))
 	require.Equal(t, "did:example:fallback", req.SourceDID)
+	require.Equal(t, "chnl-fallback", req.ChannelID)
+}
+
+func TestPopulateInteractionFieldsUsesChannelFallbackWhenInteractionMetadataMissing(t *testing.T) {
+	client := &Client{registry: catalog.NewRegistry()}
+	client.channelID = "chnl-fallback"
+	client.registry.ReplaceInteractions([]catalog.Interaction{{
+		ID:        "intr-3",
+		SourceDID: "did:example:source",
+		TargetDID: "did:example:target",
+	}})
+
+	req := TransactionRequest{CorrelationID: "corr-4", InteractionID: "intr-3"}
+	require.NoError(t, client.populateInteractionFields(context.Background(), &req))
+	require.Equal(t, "chnl-fallback", req.ChannelID)
+	require.Equal(t, "did:example:source", req.SourceDID)
+	require.Equal(t, "did:example:target", req.TargetDID)
 }
 
 func TestCloseSilentlyHandlesNil(t *testing.T) {
