@@ -35,6 +35,16 @@ type Client struct {
 
 	participantMu  sync.RWMutex
 	participantDID string
+	channelID      string
+	customerID     string
+	workspaceID    string
+	email          string
+	name           string
+	tenantIDs      []string
+	roles          []string
+	memberID       string
+	sessionID      string
+	orgID          string
 }
 
 // NewClient constructs a new Client instance using the supplied configuration.
@@ -118,11 +128,45 @@ func (c *Client) tokenValue(ctx context.Context) (string, error) {
 		return "", err
 	}
 
+	c.participantMu.Lock()
 	if did := strings.TrimSpace(token.ParticipantDID); did != "" {
-		c.participantMu.Lock()
 		c.participantDID = did
-		c.participantMu.Unlock()
 	}
+	if channel := strings.TrimSpace(token.ChannelID); channel != "" {
+		c.channelID = channel
+	}
+	if customer := strings.TrimSpace(token.CustomerID); customer != "" {
+		c.customerID = customer
+	}
+	if workspace := strings.TrimSpace(token.WorkspaceID); workspace != "" {
+		c.workspaceID = workspace
+	}
+	if email := strings.TrimSpace(token.Email); email != "" {
+		c.email = email
+	}
+	if name := strings.TrimSpace(token.Name); name != "" {
+		c.name = name
+	}
+	if token.TenantIDs != nil {
+		c.tenantIDs = append([]string(nil), token.TenantIDs...)
+	} else {
+		c.tenantIDs = nil
+	}
+	if token.Roles != nil {
+		c.roles = append([]string(nil), token.Roles...)
+	} else {
+		c.roles = nil
+	}
+	if member := strings.TrimSpace(token.MemberID); member != "" {
+		c.memberID = member
+	}
+	if session := strings.TrimSpace(token.SessionID); session != "" {
+		c.sessionID = session
+	}
+	if org := strings.TrimSpace(token.OrgID); org != "" {
+		c.orgID = org
+	}
+	c.participantMu.Unlock()
 
 	return token.AccessToken, nil
 }
@@ -131,4 +175,10 @@ func (c *Client) cachedParticipantDID() string {
 	c.participantMu.RLock()
 	defer c.participantMu.RUnlock()
 	return c.participantDID
+}
+
+func (c *Client) cachedChannelID() string {
+	c.participantMu.RLock()
+	defer c.participantMu.RUnlock()
+	return c.channelID
 }
