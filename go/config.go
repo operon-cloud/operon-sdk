@@ -10,9 +10,9 @@ import (
 
 const (
 	// DefaultBaseURL is used when Config.BaseURL is unset.
-	DefaultBaseURL = "https://api.dev.operon.cloud/client-api"
+	DefaultBaseURL = "https://api.operon.cloud/client-api"
 	// DefaultTokenURL is used when Config.TokenURL is unset.
-	DefaultTokenURL = "https://auth.dev.operon.cloud/oauth2/token"
+	DefaultTokenURL = "https://auth.operon.cloud/oauth2/token"
 	// DefaultHTTPTimeout controls the default HTTP client timeout if none is provided.
 	DefaultHTTPTimeout = 30 * time.Second
 	// defaultTokenLeeway subtracts this duration from expires_in to refresh tokens proactively.
