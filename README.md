@@ -14,7 +14,8 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 > ✅ Java (1.0.0)  
 > ✅ Node.js (1.0.0)  
 > ✅ .NET (1.0.0)  
-> ✅ Rust (1.0.0)
+> ✅ Rust (1.0.0)  
+> ✅ Python (1.0.0)
 
 ---
 
@@ -312,6 +313,49 @@ cargo test
 ```
 
 The crate includes integration tests powered by `wiremock` covering token refresh, self-signing, and manual signature flows.
+
+---
+
+## Python SDK (`operon-sdk`)
+
+The Python package targets **Python 3.10+** and provides async APIs built on `httpx` and Pydantic. Automatic token refresh, catalog caching, and optional self-signing mirror the other SDKs.
+
+### Installation
+
+```bash
+pip install operon-sdk
+```
+
+### Quick Start
+
+```python
+import asyncio
+from operon_sdk import OperonClient, OperonConfig
+from operon_sdk.models import TransactionRequest
+
+async def main() -> None:
+    config = OperonConfig(client_id="client", client_secret="secret")
+    client = OperonClient(config)
+    await client.init()
+
+    request = TransactionRequest.new("corr-123", "int-abc").with_payload_bytes(b"{}")
+    txn = await client.submit_transaction(request)
+    print("Transaction", txn.id)
+
+asyncio.run(main())
+```
+
+### Building & Testing
+
+```bash
+cd python/operon_sdk
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .[dev]
+pytest
+```
+
+The test suite uses `pytest` + `respx` to verify token refresh, self-signing, and manual signature flows.
 
 ---
 

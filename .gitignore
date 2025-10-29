@@ -24,3 +24,9 @@ dist/
 **/bin/
 **/obj/
 *.nupkg
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+.mypy_cache/
+.venv
+python/operon_sdk/.venv/
