@@ -8,7 +8,7 @@ Use the Maven coordinates once the artifact is published (example coordinates sh
 
 ```xml
 <dependency>
-  <groupId>com.operoncloud</groupId>
+  <groupId>cloud.operon</groupId>
   <artifactId>operon-sdk</artifactId>
   <version>1.0.0</version>
   <scope>compile</scope>
@@ -19,7 +19,7 @@ Gradle (Kotlin DSL):
 
 ```kotlin
 dependencies {
-  implementation("com.operoncloud:operon-sdk:1.0.0")
+  implementation("cloud.operon:operon-sdk:1.0.0")
 }
 ```
 
@@ -32,7 +32,7 @@ mvn -f java/pom.xml -DskipTests=false clean verify
 ## Quick Start
 
 ```java
-import com.operoncloud.sdk.*;
+import cloud.operon.sdk.*;
 
 public class Example {
   public static void main(String[] args) throws Exception {
