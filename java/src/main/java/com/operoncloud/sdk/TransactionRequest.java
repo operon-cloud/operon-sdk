@@ -90,6 +90,12 @@ public final class TransactionRequest {
         return payloadHash;
     }
 
+    /**
+     * Ensures the request satisfies the platform contract. Invoked internally by {@link OperonClient} immediately
+     * before issuing the HTTP call.
+     *
+     * @throws OperonException when required fields are missing or malformed.
+     */
     public void validateForSubmit() throws OperonException {
         if (correlationId == null || correlationId.isBlank()) {
             throw new OperonException("CorrelationID is required");
@@ -123,6 +129,13 @@ public final class TransactionRequest {
         }
     }
 
+    /**
+     * Resolves the payload into the wire format expected by the Operon API. The method returns both the base64 encoded
+     * payload (when bytes were provided) and the authoritative payload hash.
+     *
+     * @return payload information ready for serialisation.
+     * @throws OperonException when neither payload bytes nor hash are supplied, or when the provided hash is invalid.
+     */
     public PayloadResolution resolvePayload() throws OperonException {
         if (payload != null && payload.length > 0) {
             String payloadData = Base64.getEncoder().encodeToString(payload);
@@ -162,9 +175,21 @@ public final class TransactionRequest {
         }
     }
 
+    /**
+     * Captures the encoded payload and its base64url SHA-256 hash. {@code payloadData} will be {@code null} when the
+     * caller supplied only a hash.
+     *
+     * @param payloadData base64 encoded payload bytes (nullable).
+     * @param payloadHash base64url encoded SHA-256 hash (never {@code null}).
+     */
     public record PayloadResolution(String payloadData, String payloadHash) {
     }
 
+    /**
+     * Fluent builder for {@link TransactionRequest}.
+     *
+     * <p>Builders are mutable and not thread-safe—create a fresh instance per request.</p>
+     */
     public static final class Builder {
         private String correlationId;
         private String channelId;
@@ -178,66 +203,106 @@ public final class TransactionRequest {
         private byte[] payload;
         private String payloadHash;
 
+        /**
+         * Sets the caller-specified idempotency key used to deduplicate submissions.
+         */
         public Builder correlationId(String correlationId) {
             this.correlationId = correlationId;
             return this;
         }
 
+        /**
+         * Overrides the channel identifier. Omit to let the client resolve it from the interaction cache or PAT.
+         */
         public Builder channelId(String channelId) {
             this.channelId = channelId;
             return this;
         }
 
+        /**
+         * Sets the interaction driving the transaction. Required.
+         */
         public Builder interactionId(String interactionId) {
             this.interactionId = interactionId;
             return this;
         }
 
+        /**
+         * Supplies an explicit timestamp. When unspecified the client uses {@link Instant#now()}.
+         */
         public Builder timestamp(Instant timestamp) {
             this.timestamp = timestamp;
             return this;
         }
 
+        /**
+         * Overrides the source DID. Optional; leave unset to derive from the interaction metadata or PAT.
+         */
         public Builder sourceDid(String sourceDid) {
             this.sourceDid = sourceDid;
             return this;
         }
 
+        /**
+         * Overrides the target DID. Optional; leave unset to derive from the interaction metadata.
+         */
         public Builder targetDid(String targetDid) {
             this.targetDid = targetDid;
             return this;
         }
 
+        /**
+         * Supplies a pre-computed signature. Required when self-signing is disabled.
+         */
         public Builder signature(Signature signature) {
             this.signature = signature;
             return this;
         }
 
+        /**
+         * Adds a human-readable label for analytics and audit records.
+         */
         public Builder label(String label) {
             this.label = label;
             return this;
         }
 
+        /**
+         * Associates free-form tags with the transaction. Leading/trailing whitespace is trimmed and empty entries are ignored.
+         */
         public Builder tags(List<String> tags) {
             this.tags = tags == null ? null : new ArrayList<>(tags);
             return this;
         }
 
+        /**
+         * Provides the raw payload bytes. The SDK encodes the data and calculates the hash automatically.
+         */
         public Builder payload(byte[] payload) {
             this.payload = payload == null ? null : payload.clone();
             return this;
         }
 
+        /**
+         * Convenience helper that accepts a UTF-8 string payload.
+         */
         public Builder payload(String payload) {
             this.payload = payload == null ? null : payload.getBytes(StandardCharsets.UTF_8);
             return this;
         }
 
+        /**
+         * Supplies a pre-computed base64url SHA-256 payload hash. Use this when you stream the payload separately.
+         * If {@link #payload(byte[])} is also set the SDK validates the hash matches the supplied bytes.
+         */
         public Builder payloadHash(String payloadHash) {
             this.payloadHash = payloadHash;
             return this;
         }
 
+        /**
+         * Creates the immutable {@link TransactionRequest}. The returned instance contains defensive copies of mutable inputs.
+         */
         public TransactionRequest build() {
             return new TransactionRequest(this);
         }

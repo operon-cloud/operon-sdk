@@ -114,7 +114,7 @@ Add the dependency to your Maven project:
 <dependency>
   <groupId>com.operoncloud</groupId>
   <artifactId>operon-sdk</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 
@@ -122,7 +122,7 @@ Or with Gradle (Kotlin DSL):
 
 ```kotlin
 dependencies {
-    implementation("com.operoncloud:operon-sdk:0.1.0-SNAPSHOT")
+    implementation("com.operoncloud:operon-sdk:1.0.0")
 }
 ```
 

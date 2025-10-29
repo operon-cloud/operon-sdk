@@ -6,6 +6,8 @@
 
 # Generic build artifacts
 bin/
+target/
+**/target/
 *.out
 *.exe
 *.dll

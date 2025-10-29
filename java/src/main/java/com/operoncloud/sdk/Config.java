@@ -11,7 +11,22 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Configuration options for {@link OperonClient}. Mirrors the Go SDK defaults while adopting Java idioms.
+ * <p>
+ * Immutable configuration container used to bootstrap {@link OperonClient} instances.
+ * </p>
+ *
+ * <h2>Design goals</h2>
+ * <ul>
+ *   <li>Mirror the Go SDK defaults so behaviour stays aligned across languages.</li>
+ *   <li>Expose a builder-style API that plays nicely with dependency-injection frameworks.</li>
+ *   <li>Validate eagerly so misconfiguration is surfaced when the client is constructed rather than at call time.</li>
+ * </ul>
+ *
+ * <p>
+ * Only {@code clientId} and {@code clientSecret} are mandatory; every other field falls back to sensible defaults
+ * (hosted production endpoints, 30 second HTTP timeouts, EdDSA signing, etc.).  Keeping the defaults centralised
+ * here means the rest of the SDK can assume it is operating with fully-sanitised values and focus on network flows.
+ * </p>
  */
 public final class Config {
 
@@ -48,10 +63,18 @@ public final class Config {
         this.signingAlgorithm = builder.signingAlgorithm;
     }
 
+    /**
+     * Creates a new {@link Builder}. Builders are single-use: call {@link Builder#build()} once and
+     * obtain a fresh builder if you need to produce a variant.
+     */
     public static Builder builder() {
         return new Builder();
     }
 
+    /**
+     * Produces a defensive copy with all defaults applied. The builder defers to this method so that programmatic
+     * callers (for example, DI containers) also receive a configuration with sanitised fields.
+     */
     public Config withDefaults() {
         String resolvedBaseUrl = sanitizeUrl(Optional.ofNullable(baseUrl).orElse(DEFAULT_BASE_URL));
         String resolvedTokenUrl = sanitizeUrl(Optional.ofNullable(tokenUrl).orElse(DEFAULT_TOKEN_URL));
@@ -110,6 +133,9 @@ public final class Config {
             .buildInternal();
     }
 
+    /**
+     * Normalises API and token URLs: trims whitespace, verifies the URI is well-formed, and strips trailing slashes.
+     */
     private static String sanitizeUrl(String url) {
         String trimmed = Optional.ofNullable(url).map(String::trim).orElse("");
         if (trimmed.isEmpty()) {
@@ -186,61 +212,101 @@ public final class Config {
         private boolean disableSelfSign;
         private String signingAlgorithm;
 
+        /**
+         * Sets the Client API base URL. Leave unset to target {@link #DEFAULT_BASE_URL}. Accepts values with or without a trailing slash.
+         */
         public Builder baseUrl(String baseUrl) {
             this.baseUrl = baseUrl;
             return this;
         }
 
+        /**
+         * Sets the OAuth token issuer URL. Leave unset to target {@link #DEFAULT_TOKEN_URL}.
+         */
         public Builder tokenUrl(String tokenUrl) {
             this.tokenUrl = tokenUrl;
             return this;
         }
 
+        /**
+         * Sets the issued M2M client identifier. This field is required.
+         */
         public Builder clientId(String clientId) {
             this.clientId = clientId;
             return this;
         }
 
+        /**
+         * Sets the companion secret for the configured client id. This field is required.
+         */
         public Builder clientSecret(String clientSecret) {
             this.clientSecret = clientSecret;
             return this;
         }
 
+        /**
+         * Overrides the OAuth scope. The platform auto-assigns defaults, so most consumers can omit this.
+         */
         public Builder scope(String scope) {
             this.scope = scope;
             return this;
         }
 
+        /**
+         * Provides a list of OAuth audience values. Blank entries are removed automatically.
+         */
         public Builder audience(List<String> audience) {
             this.audience = audience == null ? null : new ArrayList<>(audience);
             return this;
         }
 
+        /**
+         * Injects a pre-configured {@link HttpClient}. Supplying your own client allows fine-grained control over TLS, proxies,
+         * observability, and retries. When omitted the SDK builds a client that uses the configured timeout.
+         */
         public Builder httpClient(HttpClient httpClient) {
             this.httpClient = httpClient;
             return this;
         }
 
+        /**
+         * Overrides the outbound HTTP timeout. Passing {@code null}, zero, or a negative duration reverts to the default.
+         */
         public Builder httpTimeout(Duration httpTimeout) {
             this.httpTimeout = httpTimeout;
             return this;
         }
 
+        /**
+         * Controls the proactive refresh window used by the token cache. Tokens are renewed when the remaining validity
+         * is less than this leeway—useful when intermediaries introduce additional latency.
+         */
         public Builder tokenLeeway(Duration tokenLeeway) {
             this.tokenLeeway = tokenLeeway;
             return this;
         }
 
+        /**
+         * Disables automatic signature minting from the Operon DID service. Set this when your integration supplies
+         * pre-computed signatures and only needs the SDK for transport concerns.
+         */
         public Builder disableSelfSign(boolean disableSelfSign) {
             this.disableSelfSign = disableSelfSign;
             return this;
         }
 
+        /**
+         * Overrides the signing algorithm used when self-signing is enabled. Defaults to {@link #DEFAULT_SIGNING_ALGORITHM}.
+         */
         public Builder signingAlgorithm(String signingAlgorithm) {
             this.signingAlgorithm = signingAlgorithm;
             return this;
         }
 
+        /**
+         * Finalises the configuration, applying defaults and validations. Subsequent builder mutations do not affect
+         * previously constructed {@link Config} instances.
+         */
         public Config build() {
             return new Config(this).withDefaults();
         }

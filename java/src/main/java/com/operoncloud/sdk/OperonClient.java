@@ -32,7 +32,22 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
- * Primary entry point for interacting with Operon Platform services.
+ * <p>
+ * Primary entry point for interacting with Operon Platform services. The client is lightweight and thread-safe:
+ * create a single instance per process, call {@link #init()} during startup (or let the first request initialise lazily),
+ * and reuse it for the lifetime of the JVM.
+ * </p>
+ *
+ * <h2>Key behaviours</h2>
+ * <ul>
+ *   <li>Caches OAuth client-credential tokens and refreshes them proactively using the leeway configured in {@link Config}.</li>
+ *   <li>Optionally performs <em>self-signing</em> of payload hashes by delegating to Operon’s DID service. Disable this
+ *       when you provide your own signatures.</li>
+ *   <li>Maintains a local cache of interactions and participants so repeated submissions can resolve channel/DID metadata
+ *       without hitting the network.</li>
+ *   <li>Is defensive around concurrency: all caches and mutable state are guarded by synchronised blocks to keep behaviour
+ *       deterministic even when multiple threads perform first-use initialisation simultaneously.</li>
+ * </ul>
  */
 public final class OperonClient implements AutoCloseable {
 
@@ -68,6 +83,10 @@ public final class OperonClient implements AutoCloseable {
 
     /**
      * Constructs a new Operon client using the supplied configuration.
+     *
+     * @param config caller-supplied configuration; only {@code clientId} and {@code clientSecret} are mandatory.
+     *               The constructor captures a defensive copy with defaults applied, so subsequent mutations to the builder
+     *               will not influence this client.
      */
     public OperonClient(Config config) {
         Objects.requireNonNull(config, "config");
@@ -95,6 +114,14 @@ public final class OperonClient implements AutoCloseable {
 
     /**
      * Eagerly initialises the client by obtaining an access token.
+     *
+     * <p>
+     * The call is idempotent: multiple threads can safely invoke {@code init()} and only the first execution performs
+     * the remote token request. If the initial token exchange fails, the exception is memoised and rethrown for each
+     * subsequent attempt so that callers have a consistent failure mode.
+     * </p>
+     *
+     * @throws OperonException when the identity broker cannot issue a token (network failure, invalid credentials, etc.).
      */
     public void init() throws OperonException {
         synchronized (initLock) {
@@ -116,6 +143,14 @@ public final class OperonClient implements AutoCloseable {
 
     /**
      * Retrieves the cached interaction catalogue, loading it on-demand if required.
+     *
+     * <p>
+     * The first call fetches interactions from the platform and caches them in-memory. Later calls return a defensive copy,
+     * allowing application code to iterate freely without worrying about concurrent modifications.
+     * </p>
+     *
+     * @return immutable interaction summaries suitable for UI display or request pre-population.
+     * @throws OperonException when the reference data cannot be loaded (for example, due to network failures).
      */
     public List<InteractionSummary> interactions() throws OperonException {
         ensureInitialized();
@@ -133,7 +168,15 @@ public final class OperonClient implements AutoCloseable {
     }
 
     /**
-     * Retrieves the cached participant directory (ID -> DID).
+     * Retrieves the cached participant directory (ID → DID).
+     *
+     * <p>
+     * Participants are loaded alongside interactions because clients often need both to construct valid transactions.
+     * The returned list is a snapshot; mutating it will not alter the internal cache.
+     * </p>
+     *
+     * @return participant summaries keyed by Operon participant id.
+     * @throws OperonException when the reference data cannot be loaded.
      */
     public List<ParticipantSummary> participants() throws OperonException {
         ensureInitialized();
@@ -145,6 +188,27 @@ public final class OperonClient implements AutoCloseable {
 
     /**
      * Submits a transaction to the Operon Client API and returns the persisted record.
+     *
+     * <p>
+     * Workflow:
+     * </p>
+     * <ol>
+     *   <li>Ensures the client is initialised (minting a token if required).</li>
+     *   <li>Resolves interaction metadata so callers can omit channel/source/target identifiers when convenient.</li>
+     *   <li>Encodes payload bytes (or validates the supplied hash) and, when enabled, obtains a signature from the DID service.</li>
+     *   <li>Performs the HTTP POST to {@code /v1/transactions} and maps the response body into a {@link Transaction}.</li>
+     * </ol>
+     *
+     * <p>
+     * The method performs comprehensive validation before talking to the network. Any {@link OperonApiException} thrown reflects
+     * the exact error returned by the Operon backend (status code + error code + message).
+     * </p>
+     *
+     * @param request transaction payload to send. Must include {@code correlationId}, {@code interactionId}, and signature material.
+     *                When calling {@link TransactionRequest#payload(byte[])} the SDK derives the hash automatically; if you prefer
+     *                to stream large objects externally provide the pre-computed {@link TransactionRequest#payloadHash(String)}.
+     * @return the persisted transaction, exactly as recorded by the platform.
+     * @throws OperonException when validation fails, when signing cannot be performed, or when the HTTP call encounters an error.
      */
     public Transaction submitTransaction(TransactionRequest request) throws OperonException {
         Objects.requireNonNull(request, "request");
@@ -238,6 +302,10 @@ public final class OperonClient implements AutoCloseable {
         }
     }
 
+    /**
+     * Closes the client. Currently a no-op because the underlying {@link HttpClient} does not require explicit shutdown,
+     * but the hook is retained for future transport strategies (for example, if we introduce Netty-based clients that need disposal).
+     */
     @Override
     public void close() {
         // httpClient is managed externally; nothing to close.

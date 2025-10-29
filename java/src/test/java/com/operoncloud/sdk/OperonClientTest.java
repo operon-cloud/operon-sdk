@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -27,17 +28,32 @@ class OperonClientTest {
     private HttpServer server;
     private URI baseUri;
     private volatile String lastTransactionBody;
+    private final AtomicInteger tokenCalls = new AtomicInteger();
+
+    private final DelegatingHandler tokenHandler = new DelegatingHandler();
+    private final DelegatingHandler interactionsHandler = new DelegatingHandler();
+    private final DelegatingHandler participantsHandler = new DelegatingHandler();
+    private final DelegatingHandler transactionsHandler = new DelegatingHandler();
+    private final DelegatingHandler signerHandler = new DelegatingHandler();
 
     @BeforeEach
     void setUp() throws IOException {
         server = HttpServer.create(new InetSocketAddress(0), 0);
-        server.createContext("/oauth2/token", new TokenHandler());
-        server.createContext("/client-api/v1/interactions", new InteractionsHandler());
-        server.createContext("/client-api/v1/participants", new ParticipantsHandler());
-        server.createContext("/client-api/v1/transactions", new TransactionHandler());
+        tokenHandler.delegate = new TokenHandler();
+        interactionsHandler.delegate = new InteractionsHandler();
+        participantsHandler.delegate = new ParticipantsHandler();
+        transactionsHandler.delegate = new TransactionHandler();
+        signerHandler.delegate = new SigningHandler();
+
+        server.createContext("/oauth2/token", tokenHandler);
+        server.createContext("/client-api/v1/interactions", interactionsHandler);
+        server.createContext("/client-api/v1/participants", participantsHandler);
+        server.createContext("/client-api/v1/transactions", transactionsHandler);
+        server.createContext("/client-api/v1/dids/self/sign", signerHandler);
         server.start();
         baseUri = URI.create("http://localhost:" + server.getAddress().getPort());
         lastTransactionBody = null;
+        tokenCalls.set(0);
     }
 
     @AfterEach
@@ -120,9 +136,116 @@ class OperonClientTest {
         client.close();
     }
 
+    @Test
+    void initFailsWhenTokenEndpointReturnsError() {
+        tokenHandler.delegate = exchange -> {
+            tokenCalls.incrementAndGet();
+            respond(exchange, 500, "{\"code\":\"INTERNAL\",\"message\":\"boom\"}");
+        };
+
+        Config config = Config.builder()
+            .baseUrl(baseUri + "/client-api")
+            .tokenUrl(baseUri + "/oauth2/token")
+            .clientId("broken")
+            .clientSecret("broken")
+            .httpClient(HttpClient.newHttpClient())
+            .disableSelfSign(true)
+            .build();
+
+        OperonClient client = new OperonClient(config);
+        OperonApiException ex = assertThrows(OperonApiException.class, client::init);
+        assertEquals(500, ex.getStatusCode());
+        assertEquals("INTERNAL", ex.getCode());
+        assertEquals(1, tokenCalls.get());
+    }
+
+    @Test
+    void submitTransactionSurfacesHttpErrors() throws Exception {
+        transactionsHandler.delegate = exchange -> {
+            respond(exchange, 403, "{\"code\":\"FORBIDDEN\",\"message\":\"denied\"}");
+        };
+
+        Config config = Config.builder()
+            .baseUrl(baseUri + "/client-api")
+            .tokenUrl(baseUri + "/oauth2/token")
+            .clientId("client-id")
+            .clientSecret("client-secret")
+            .httpClient(HttpClient.newHttpClient())
+            .disableSelfSign(true)
+            .build();
+
+        OperonClient client = new OperonClient(config);
+        client.init();
+
+        TransactionRequest request = TransactionRequest.builder()
+            .correlationId("c1")
+            .interactionId("intr-1")
+            .signature(new Signature("EdDSA", "sig", null))
+            .payload("payload")
+            .build();
+
+        OperonApiException ex = assertThrows(OperonApiException.class, () -> client.submitTransaction(request));
+        assertEquals(403, ex.getStatusCode());
+        assertEquals("FORBIDDEN", ex.getCode());
+    }
+
+    @Test
+    void submitTransactionFailsWhenSelfSigningErrors() throws Exception {
+        signerHandler.delegate = exchange -> respond(exchange, 500, "{\"code\":\"SIGNING_FAILED\",\"message\":\"sign error\"}");
+
+        Config config = Config.builder()
+            .baseUrl(baseUri + "/client-api")
+            .tokenUrl(baseUri + "/oauth2/token")
+            .clientId("client-id")
+            .clientSecret("client-secret")
+            .httpClient(HttpClient.newHttpClient())
+            .disableSelfSign(false)
+            .build();
+
+        OperonClient client = new OperonClient(config);
+        client.init();
+
+        TransactionRequest request = TransactionRequest.builder()
+            .correlationId("c1")
+            .interactionId("intr-1")
+            .payload("payload")
+            .build();
+
+        OperonApiException ex = assertThrows(OperonApiException.class, () -> client.submitTransaction(request));
+        assertEquals("SIGNING_FAILED", ex.getCode());
+    }
+
+    @Test
+    void throwsWhenInteractionMissingAfterReload() throws Exception {
+        interactionsHandler.delegate = exchange -> respond(exchange, 200, "{\"data\":[]}");
+
+        Config config = Config.builder()
+            .baseUrl(baseUri + "/client-api")
+            .tokenUrl(baseUri + "/oauth2/token")
+            .clientId("client-id")
+            .clientSecret("client-secret")
+            .httpClient(HttpClient.newHttpClient())
+            .disableSelfSign(true)
+            .build();
+
+        OperonClient client = new OperonClient(config);
+        client.init();
+
+        TransactionRequest request = TransactionRequest.builder()
+            .correlationId("missing")
+            .interactionId("intr-unknown")
+            .signature(new Signature("EdDSA", "sig", null))
+            .payload("payload")
+            .build();
+
+        OperonException ex = assertThrows(OperonException.class, () -> client.submitTransaction(request));
+        assertTrue(ex.getMessage().contains("interaction intr-unknown not found"));
+    }
+
     private class TokenHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            tokenCalls.incrementAndGet();
             String token = buildToken();
             String body = "{\"access_token\":\"" + token + "\",\"expires_in\":3600}";
             respond(exchange, 200, body);
@@ -155,7 +278,29 @@ class OperonClientTest {
         }
     }
 
-    private void respond(HttpExchange exchange, int status, String body) throws IOException {
+    private class SigningHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String response = "{\"signature\":{\"algorithm\":\"EdDSA\",\"value\":\"signed-value\",\"keyId\":\"did:test:source#keys-1\"}}";
+            respond(exchange, 200, response);
+        }
+    }
+
+    private static class DelegatingHandler implements HttpHandler {
+        volatile HttpHandler delegate;
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (delegate == null) {
+                exchange.sendResponseHeaders(500, -1);
+                exchange.close();
+            } else {
+                delegate.handle(exchange);
+            }
+        }
+    }
+
+    private static void respond(HttpExchange exchange, int status, String body) throws IOException {
         exchange.getResponseHeaders().add("Content-Type", "application/json");
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.sendResponseHeaders(status, bytes.length);
