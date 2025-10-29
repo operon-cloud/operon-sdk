@@ -29,14 +29,16 @@ cli = ["typer>=0.12,<1.0"]
 dev = ["pytest>=8.3", "pytest-asyncio>=0.23", "respx>=0.21", "anyio>=4.4", "mypy>=1.10", "black>=24.4", "isort>=5.13"]
 
 [tool.setuptools.package-dir]
-"" = "operon_sdk"
+"" = "."
 
 [tool.setuptools.packages.find]
-where = ["operon_sdk"]
+where = ["."]
+include = ["operon_sdk", "operon_sdk.*"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+pythonpath = [".."]
 
 [tool.black]
 line-length = 100

@@ -29,49 +29,66 @@ async def test_submit_transaction_self_sign():
     client = OperonClient(config)
 
     with respx.mock(base_url="https://example.com") as mock:
-        mock.post("/oauth/token").return_value = Response(200, json={
-            "access_token": build_token({"participant_did": "did:test:123", "channel_id": "chnl"}),
-            "expires_in": 300,
-        })
-        mock.get("/api/v1/interactions").return_value = Response(200, json={
-            "data": [
-                {
-                    "id": "int-123",
-                    "channelId": "chnl",
-                    "sourceParticipantId": "part-1",
-                    "targetParticipantId": "part-2",
-                }
-            ]
-        })
-        mock.get("/api/v1/participants").return_value = Response(200, json={
-            "data": [
-                {"id": "part-1", "did": "did:test:123"},
-                {"id": "part-2", "did": "did:test:456"},
-            ]
-        })
-        mock.post("/api/v1/dids/self/sign").return_value = Response(200, json={
-            "signature": {
-                "algorithm": "EdDSA",
-                "value": "signed-value",
-                "keyId": "did:test:123#keys-1",
-            }
-        })
-        mock.post("/api/v1/transactions").return_value = Response(200, json={
-            "id": "txn-1",
-            "correlationId": "corr-1",
-            "channelId": "chnl",
-            "interactionId": "int-123",
-            "timestamp": "2025-01-01T00:00:00Z",
-            "sourceDid": "did:test:123",
-            "targetDid": "did:test:456",
-            "signature": {
-                "algorithm": "EdDSA",
-                "value": "signed-value",
-                "keyId": "did:test:123#keys-1",
+        mock.post("/oauth/token").return_value = Response(
+            200,
+            json={
+                "access_token": build_token(
+                    {"participant_did": "did:test:123", "channel_id": "chnl"}
+                ),
+                "expires_in": 300,
             },
-            "payloadHash": "hash",
-            "status": "PENDING",
-        })
+        )
+        mock.get("/api/v1/interactions").return_value = Response(
+            200,
+            json={
+                "data": [
+                    {
+                        "id": "int-123",
+                        "channelId": "chnl",
+                        "sourceParticipantId": "part-1",
+                        "targetParticipantId": "part-2",
+                    }
+                ]
+            },
+        )
+        mock.get("/api/v1/participants").return_value = Response(
+            200,
+            json={
+                "data": [
+                    {"id": "part-1", "did": "did:test:123"},
+                    {"id": "part-2", "did": "did:test:456"},
+                ]
+            },
+        )
+        mock.post("/api/v1/dids/self/sign").return_value = Response(
+            200,
+            json={
+                "signature": {
+                    "algorithm": "EdDSA",
+                    "value": "signed-value",
+                    "keyId": "did:test:123#keys-1",
+                }
+            },
+        )
+        mock.post("/api/v1/transactions").return_value = Response(
+            200,
+            json={
+                "id": "txn-1",
+                "correlationId": "corr-1",
+                "channelId": "chnl",
+                "interactionId": "int-123",
+                "timestamp": "2025-01-01T00:00:00Z",
+                "sourceDid": "did:test:123",
+                "targetDid": "did:test:456",
+                "signature": {
+                    "algorithm": "EdDSA",
+                    "value": "signed-value",
+                    "keyId": "did:test:123#keys-1",
+                },
+                "payloadHash": "hash",
+                "status": "PENDING",
+            },
+        )
 
         await client.init()
         request = TransactionRequest.new("corr-1", "int-123").with_payload_bytes(b"{}")
@@ -93,28 +110,36 @@ async def test_submit_transaction_manual_signature():
     client = OperonClient(config)
 
     with respx.mock(base_url="https://example.com") as mock:
-        mock.post("/oauth/token").return_value = Response(200, json={
-            "access_token": build_token({"participant_did": "did:test:999", "channel_id": "chnl"}),
-            "expires_in": 300,
-        })
+        mock.post("/oauth/token").return_value = Response(
+            200,
+            json={
+                "access_token": build_token(
+                    {"participant_did": "did:test:999", "channel_id": "chnl"}
+                ),
+                "expires_in": 300,
+            },
+        )
         mock.get("/api/v1/interactions").return_value = Response(200, json={"data": []})
         mock.get("/api/v1/participants").return_value = Response(200, json={"data": []})
-        mock.post("/api/v1/transactions").return_value = Response(200, json={
-            "id": "txn-2",
-            "correlationId": "corr-2",
-            "channelId": "chnl",
-            "interactionId": "int-999",
-            "timestamp": "2025-01-01T00:00:00Z",
-            "sourceDid": "did:test:999",
-            "targetDid": "did:test:888",
-            "signature": {
-                "algorithm": "EdDSA",
-                "value": "manual",
-                "keyId": "did:test:999#keys-1",
+        mock.post("/api/v1/transactions").return_value = Response(
+            200,
+            json={
+                "id": "txn-2",
+                "correlationId": "corr-2",
+                "channelId": "chnl",
+                "interactionId": "int-999",
+                "timestamp": "2025-01-01T00:00:00Z",
+                "sourceDid": "did:test:999",
+                "targetDid": "did:test:888",
+                "signature": {
+                    "algorithm": "EdDSA",
+                    "value": "manual",
+                    "keyId": "did:test:999#keys-1",
+                },
+                "payloadHash": "hash",
+                "status": "PENDING",
             },
-            "payloadHash": "hash",
-            "status": "PENDING",
-        })
+        )
 
         await client.init()
         request = (

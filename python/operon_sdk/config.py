@@ -75,9 +75,12 @@ class OperonConfig:
         return urljoin(self.base_url, path)
 
     @classmethod
-    def from_env(cls, *,
-                 client_id_env: str = "OPERON_CLIENT_ID",
-                 client_secret_env: str = "OPERON_CLIENT_SECRET") -> "OperonConfig":
+    def from_env(
+        cls,
+        *,
+        client_id_env: str = "OPERON_CLIENT_ID",
+        client_secret_env: str = "OPERON_CLIENT_SECRET",
+    ) -> "OperonConfig":
         import os
 
         client_id = os.environ.get(client_id_env)

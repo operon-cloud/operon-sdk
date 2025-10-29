@@ -34,7 +34,9 @@ class OperonClient:
     ) -> None:
         self._config = config
         self._client = client or httpx.AsyncClient(timeout=config.http_timeout)
-        self._token_provider = token_provider or ClientCredentialsTokenProvider(config, client=self._client)
+        self._token_provider = token_provider or ClientCredentialsTokenProvider(
+            config, client=self._client
+        )
         self._interactions: Optional[List[InteractionSummary]] = None
         self._participants: Optional[List[ParticipantSummary]] = None
         self._catalog_lock = asyncio.Lock()
@@ -98,33 +100,50 @@ class OperonClient:
         return Transaction.model_validate(response.json())
 
     async def _ensure_catalog(self, request: TransactionRequest, token: AccessToken) -> None:
-        if request.source_did and request.target_did and request.channel_id:
-            return
         async with self._catalog_lock:
             if self._interactions is None or self._participants is None:
                 await self._refresh_catalog(token)
             if self._interactions:
-                match = next((item for item in self._interactions if item.id == request.interaction_id), None)
+                match = next(
+                    (item for item in self._interactions if item.id == request.interaction_id), None
+                )
                 if match:
                     request.channel_id = request.channel_id or match.channel_id
-                    request.source_did = request.source_did or match.source_did or token.participant_did
+                    request.source_did = (
+                        request.source_did or match.source_did or token.participant_did
+                    )
                     request.target_did = request.target_did or match.target_did
 
     async def _refresh_catalog(self, token: AccessToken) -> None:
         headers = {"Authorization": f"Bearer {token.value}"}
-        interactions_task = self._client.get(self._config.api_url(INTERACTIONS_ENDPOINT), headers=headers)
-        participants_task = self._client.get(self._config.api_url(PARTICIPANTS_ENDPOINT), headers=headers)
-        interactions_response, participants_response = await asyncio.gather(interactions_task, participants_task)
+        interactions_task = self._client.get(
+            self._config.api_url(INTERACTIONS_ENDPOINT), headers=headers
+        )
+        participants_task = self._client.get(
+            self._config.api_url(PARTICIPANTS_ENDPOINT), headers=headers
+        )
+        interactions_response, participants_response = await asyncio.gather(
+            interactions_task, participants_task
+        )
 
         if interactions_response.status_code >= 400:
-            raise ApiError(interactions_response.status_code, await self._extract_error(interactions_response))
+            raise ApiError(
+                interactions_response.status_code, await self._extract_error(interactions_response)
+            )
         if participants_response.status_code >= 400:
-            raise ApiError(participants_response.status_code, await self._extract_error(participants_response))
+            raise ApiError(
+                participants_response.status_code, await self._extract_error(participants_response)
+            )
 
         envelope = interactions_response.json()
         participants_envelope = participants_response.json()
-        self._interactions = [InteractionSummary.model_validate(item) for item in envelope.get("data", [])]
-        participants = [ParticipantSummary.model_validate(item) for item in participants_envelope.get("data", [])]
+        self._interactions = [
+            InteractionSummary.model_validate(item) for item in envelope.get("data", [])
+        ]
+        participants = [
+            ParticipantSummary.model_validate(item)
+            for item in participants_envelope.get("data", [])
+        ]
         mapping = {p.id: p.did for p in participants}
         for interaction in self._interactions:
             if interaction.source_participant_id in mapping:
@@ -133,7 +152,9 @@ class OperonClient:
                 interaction.target_did = mapping[interaction.target_participant_id]
         self._participants = participants
 
-    async def _resolve_signature(self, request: TransactionRequest, payload_hash: str, token: AccessToken) -> Signature:
+    async def _resolve_signature(
+        self, request: TransactionRequest, payload_hash: str, token: AccessToken
+    ) -> Signature:
         if request.signature:
             signature = request.signature
             if not signature.value.strip():
@@ -168,7 +189,9 @@ class OperonClient:
         if "signature" not in payload:
             raise ValidationError("self sign response missing signature")
         signature = Signature.model_validate(payload["signature"])
-        signature.key_id = signature.key_id or self._build_key_id(request.source_did or token.participant_did)
+        signature.key_id = signature.key_id or self._build_key_id(
+            request.source_did or token.participant_did
+        )
         return signature
 
     async def _extract_error(self, response: httpx.Response) -> str:

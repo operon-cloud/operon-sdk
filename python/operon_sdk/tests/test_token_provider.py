@@ -20,14 +20,19 @@ def build_token(claims: dict[str, str]) -> str:
 
 @pytest.mark.asyncio
 async def test_token_cached_until_expiry():
-    config = OperonConfig(client_id="client", client_secret="secret", token_url="https://example.com/token")
+    config = OperonConfig(
+        client_id="client", client_secret="secret", token_url="https://example.com/token"
+    )
 
     provider = ClientCredentialsTokenProvider(config)
     with respx.mock(base_url="https://example.com") as mock:
-        mock.post("/token").return_value = Response(200, json={
-            "access_token": build_token({"participant_did": "did:test:123"}),
-            "expires_in": 120,
-        })
+        mock.post("/token").return_value = Response(
+            200,
+            json={
+                "access_token": build_token({"participant_did": "did:test:123"}),
+                "expires_in": 120,
+            },
+        )
         token1 = await provider.get_token()
         token2 = await provider.get_token()
 
@@ -48,14 +53,20 @@ async def test_token_refreshes_when_expiring():
     with respx.mock(base_url="https://example.com") as mock:
         route = mock.post("/token")
         route.side_effect = [
-            Response(200, json={
-                "access_token": build_token({}),
-                "expires_in": 5,
-            }),
-            Response(200, json={
-                "access_token": build_token({"channel_id": "chnl"}),
-                "expires_in": 120,
-            }),
+            Response(
+                200,
+                json={
+                    "access_token": build_token({}),
+                    "expires_in": 5,
+                },
+            ),
+            Response(
+                200,
+                json={
+                    "access_token": build_token({"channel_id": "chnl"}),
+                    "expires_in": 120,
+                },
+            ),
         ]
 
         token1 = await provider.get_token()

@@ -30,3 +30,4 @@ __pycache__/
 .mypy_cache/
 .venv
 python/operon_sdk/.venv/
+**/*.egg-info/

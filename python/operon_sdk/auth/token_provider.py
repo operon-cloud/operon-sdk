@@ -8,6 +8,19 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
+from urllib.parse import urlencode
+
+
+class _AsyncBytes(httpx.AsyncByteStream):
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def __aiter__(self):
+        return self.aiter_bytes()
+
+    async def aiter_bytes(self):
+        yield self._data
+
 
 from ..config import OperonConfig
 from ..errors import ApiError, OperonError, TransportError, ValidationError
@@ -30,7 +43,9 @@ class ClientCredentialsTokenProvider:
 
     async def get_token(self) -> AccessToken:
         async with self._lock:
-            if self._cached and self._cached.expires_at - timedelta(seconds=self._config.token_leeway) > datetime.now(timezone.utc):
+            if self._cached and self._cached.expires_at - timedelta(
+                seconds=self._config.token_leeway
+            ) > datetime.now(timezone.utc):
                 return self._cached
             token = await self._fetch_token()
             self._cached = token
@@ -41,9 +56,9 @@ class ClientCredentialsTokenProvider:
             self._cached = None
 
     async def _fetch_token(self) -> AccessToken:
-        request = self._build_request()
+        params = self._build_request_params()
         try:
-            response = await self._client.send(request)
+            response = await self._client.post(self._config.token_url, **params)
         except httpx.HTTPError as exc:
             raise TransportError("failed to request access token", original=exc) from exc
 
@@ -64,13 +79,13 @@ class ClientCredentialsTokenProvider:
             channel_id=claims.get("channel_id"),
         )
 
-    def _build_request(self) -> httpx.Request:
+    def _build_request_params(self) -> Dict[str, Any]:
+        headers = {"Accept": "application/json"}
         token_url = self._config.token_url
         is_legacy = "/v1/session/m2m" in token_url
-        headers = {"Accept": "application/json"}
 
         if is_legacy:
-            body = {
+            body: Dict[str, Any] = {
                 "client_id": self._config.client_id,
                 "client_secret": self._config.client_secret,
                 "grant_type": "client_credentials",
@@ -79,16 +94,18 @@ class ClientCredentialsTokenProvider:
                 body["scope"] = self._config.scope
             if self._config.audience:
                 body["audience"] = self._config.audience
-            return httpx.Request("POST", token_url, headers=headers, json=body)
+            return {"json": body, "headers": headers}
 
         form: List[tuple[str, str]] = [("grant_type", "client_credentials")]
         if self._config.scope:
             form.append(("scope", self._config.scope))
         for audience in self._config.audience:
             form.append(("audience", audience))
+        encoded = urlencode(form, doseq=True).encode()
         credentials = f"{self._config.client_id}:{self._config.client_secret}".encode()
         headers["Authorization"] = "Basic " + base64.b64encode(credentials).decode()
-        return httpx.Request("POST", token_url, headers=headers, data=form)
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+        return {"content": _AsyncBytes(encoded), "headers": headers}
 
     async def _decode_error_message(self, response: httpx.Response) -> str:
         try:
@@ -113,6 +130,3 @@ class ClientCredentialsTokenProvider:
         if not isinstance(data, dict):
             return None
         return {k: str(v) for k, v in data.items() if isinstance(k, str)}
-
-
-__all__ = ["ClientCredentialsTokenProvider", "AccessToken"]
