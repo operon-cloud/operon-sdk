@@ -14,7 +14,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 > ✅ Java (1.0.0)  
 > ✅ Node.js (1.0.0)  
 > ✅ .NET (1.0.0)  
-> ✅ Rust (0.1.0)
+> ✅ Rust (1.0.0)
 
 ---
 
