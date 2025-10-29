@@ -315,18 +315,6 @@ The crate includes integration tests powered by `wiremock` covering token refres
 
 ---
 
-## Roadmap: Additional Languages
-
-We are actively expanding the SDK surface area. Track progress or contribute feedback via the issues board.
-
-| Language | Status        | Tracking Issue                                         | Notes                              |
-|----------|---------------|--------------------------------------------------------|------------------------------------|
-| Java     | Planned       | [#12](https://github.com/operon-cloud/operon-sdk/issues/12) | Targeting Spring Boot & Jakarta EE |
-| Node.js  | Planned       | [#13](https://github.com/operon-cloud/operon-sdk/issues/13) | Targeting ESM + TypeScript users   |
-| .NET     | Planned       | [#14](https://github.com/operon-cloud/operon-sdk/issues/14) | Targeting .NET 8 minimal APIs      |
-
-Interested in early access or partnership on these runtimes? [Contact us](mailto:sdk@operon.cloud).
-
 ---
 
 ## Versioning & Releases
