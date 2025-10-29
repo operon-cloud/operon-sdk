@@ -104,7 +104,7 @@ Tests rely on Go’s standard tooling and include lightweight HTTP fixtures to v
 
 ---
 
-## Java SDK (`com.operoncloud:operon-sdk`)
+## Java SDK (`cloud.operon:operon-sdk`)
 
 The Java client brings the same ergonomics to JVM services targeting JDK 17 or 21.
 
@@ -114,7 +114,7 @@ Add the dependency to your Maven project:
 
 ```xml
 <dependency>
-  <groupId>com.operoncloud</groupId>
+  <groupId>cloud.operon</groupId>
   <artifactId>operon-sdk</artifactId>
   <version>1.0.0</version>
 </dependency>
@@ -124,14 +124,14 @@ Or with Gradle (Kotlin DSL):
 
 ```kotlin
 dependencies {
-    implementation("com.operoncloud:operon-sdk:1.0.0")
+    implementation("cloud.operon:operon-sdk:1.0.0")
 }
 ```
 
 ### Quick Start
 
 ```java
-import com.operoncloud.sdk.*;
+import cloud.operon.sdk.*;
 import java.time.Duration;
 
 public class Example {
