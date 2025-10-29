@@ -8,18 +8,18 @@ Use the Maven coordinates once the artifact is published (example coordinates sh
 
 ```xml
 <dependency>
-  <groupId>cloud.operon</groupId>
+  <groupId>com.operoncloud</groupId>
   <artifactId>operon-sdk</artifactId>
   <version>1.0.0</version>
   <scope>compile</scope>
-  </dependency>
+</dependency>
 ```
 
 Gradle (Kotlin DSL):
 
 ```kotlin
 dependencies {
-  implementation("cloud.operon:operon-sdk:1.0.0")
+  implementation("com.operoncloud:operon-sdk:1.0.0")
 }
 ```
 
@@ -32,11 +32,11 @@ mvn -f java/pom.xml -DskipTests=false clean verify
 ## Quick Start
 
 ```java
-import cloud.operon.sdk.*;
+import com.operoncloud.sdk.*;
 
 public class Example {
   public static void main(String[] args) throws Exception {
-    OperonConfig config = OperonConfig.builder()
+    Config config = Config.builder()
         .clientId(System.getenv("OPERON_CLIENT_ID"))
         .clientSecret(System.getenv("OPERON_CLIENT_SECRET"))
         .build();
@@ -44,10 +44,10 @@ public class Example {
     OperonClient client = new OperonClient(config);
     client.init();
 
-    TransactionRequest request = TransactionRequest.newBuilder()
-        .setCorrelationId("corr-123")
-        .setInteractionId("int-abc")
-        .setPayloadBytes("{\"foo\":\"bar\"}".getBytes())
+    TransactionRequest request = TransactionRequest.builder()
+        .correlationId("corr-123")
+        .interactionId("int-abc")
+        .payload("{\"foo\":\"bar\"}")
         .build();
 
     Transaction txn = client.submitTransaction(request);
