@@ -13,7 +13,8 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 > ✅ Go (1.1.2)  
 > ✅ Java (1.0.0)  
 > ✅ Node.js (1.0.0)  
-> ⏳ .NET (coming soon)
+> ✅ .NET (1.0.0)  
+> ✅ Rust (0.1.0)
 
 ---
 
@@ -217,6 +218,100 @@ npm run build
 ```
 
 The build emits ESM output with bundled type declarations, and the Vitest suite covers configuration validation, token lifecycle management, and transaction submission (including automatic signing and manual signature paths).
+
+---
+
+## .NET SDK (`Operon.Sdk`)
+
+The .NET library targets **.NET 8** and mirrors the functionality available in the Go, Java, and Node packages. It embraces modern .NET conventions (nullable reference types, `HttpClient`, `System.Text.Json`) and ships with XML documentation for IntelliSense.
+
+### Installation
+
+```bash
+dotnet add package Operon.Sdk --version 1.0.0
+```
+
+### Quick Start
+
+```csharp
+using Operon.Sdk;
+using Operon.Sdk.Models;
+
+var config = new OperonConfig(
+    clientId: Environment.GetEnvironmentVariable("OPERON_CLIENT_ID")!,
+    clientSecret: Environment.GetEnvironmentVariable("OPERON_CLIENT_SECRET")!
+);
+
+await using var client = new OperonClient(config);
+await client.InitAsync();
+
+var response = await client.SubmitTransactionAsync(new TransactionRequest
+{
+    CorrelationId = "corr-123",
+    InteractionId = "int-abc",
+    PayloadBytes = JsonSerializer.SerializeToUtf8Bytes(new { foo = "bar" })
+});
+
+Console.WriteLine($"Transaction {response.Id} status={response.Status}");
+```
+
+### Building & Testing
+
+```bash
+cd dotnet
+dotnet restore
+dotnet test
+```
+
+The solution includes `Operon.Sdk.Tests`, an xUnit project that exercises configuration defaults, token lifecycle behaviour, and transaction submission (including automatic self-signing).
+
+---
+
+## Rust SDK (`operon-sdk`)
+
+The Rust crate targets **Rust 1.75+** and ships with async APIs built on `reqwest`, `tokio`, and `serde`. Automatic token refresh and optional self-signing mirror other SDKs while staying idiomatic to Rust.
+
+### Installation
+
+```toml
+[dependencies]
+operon-sdk = { path = "rust/operon-sdk" }
+```
+
+### Quick Start
+
+```rust
+use operon_sdk::{OperonClient, OperonConfig};
+use operon_sdk::models::TransactionRequest;
+
+#[tokio::main]
+async fn main() -> Result<(), operon_sdk::errors::OperonError> {
+    let config = OperonConfig::builder()
+        .client_id(std::env::var("OPERON_CLIENT_ID")?)
+        .client_secret(std::env::var("OPERON_CLIENT_SECRET")?)
+        .build()?;
+
+    let client = OperonClient::new(config)?;
+    client.init().await?;
+
+    let request = TransactionRequest::new("corr-123", "int-abc")?
+        .with_payload_bytes(br"{"foo":"bar"}");
+
+    let transaction = client.submit_transaction(request).await?;
+    println!("transaction {} status={}", transaction.id, transaction.status);
+    Ok(())
+}
+```
+
+### Building & Testing
+
+```bash
+cd rust/operon-sdk
+cargo fmt
+cargo test
+```
+
+The crate includes integration tests powered by `wiremock` covering token refresh, self-signing, and manual signature flows.
 
 ---
 

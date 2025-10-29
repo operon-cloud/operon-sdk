@@ -1,0 +1,36 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dotnet", "dotnet", "{71E6E750-85FD-B5BC-4321-E01377EC6231}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Operon.Sdk.Tests", "dotnet\Operon.Sdk.Tests\Operon.Sdk.Tests.csproj", "{4CC52B59-A635-F813-AAD8-9774C9441F20}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Operon.Sdk", "dotnet\Operon.Sdk\Operon.Sdk.csproj", "{9FDF513F-71FA-A964-8D45-7C680404FD9B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4CC52B59-A635-F813-AAD8-9774C9441F20}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4CC52B59-A635-F813-AAD8-9774C9441F20}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4CC52B59-A635-F813-AAD8-9774C9441F20}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4CC52B59-A635-F813-AAD8-9774C9441F20}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FDF513F-71FA-A964-8D45-7C680404FD9B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FDF513F-71FA-A964-8D45-7C680404FD9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FDF513F-71FA-A964-8D45-7C680404FD9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FDF513F-71FA-A964-8D45-7C680404FD9B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{4CC52B59-A635-F813-AAD8-9774C9441F20} = {71E6E750-85FD-B5BC-4321-E01377EC6231}
+		{9FDF513F-71FA-A964-8D45-7C680404FD9B} = {71E6E750-85FD-B5BC-4321-E01377EC6231}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E26580A9-E8A4-4944-9A73-E22DE218EE62}
+	EndGlobalSection
+EndGlobal

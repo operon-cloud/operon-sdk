@@ -1,0 +1,33 @@
+[package]
+name = "operon-sdk"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Operon Cloud <support@operon.cloud>"]
+description = "Official Operon SDK for Rust applications"
+repository = "https://github.com/operon-cloud/operon-sdk"
+readme = "README.md"
+keywords = ["operon", "sdk", "ledger", "api"]
+categories = ["api-bindings", "cryptography"]
+
+[package.metadata]
+msrv = "1.75"
+
+[features]
+default = ["self-signing"]
+self-signing = []
+
+[dependencies]
+async-trait = "0.1"
+base64 = "0.22"
+reqwest = { version = "0.12", features = ["json", "gzip", "brotli", "rustls-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.36", features = ["macros", "rt", "sync"] }
+
+[dev-dependencies]
+wiremock = "0.6"
