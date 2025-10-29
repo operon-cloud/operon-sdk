@@ -11,7 +11,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 
 > **SDK Coverage**  
 > ✅ Go (primary)  
-> ⏳ Java (coming soon)  
+> ✅ Java (preview)  
 > ⏳ Node.js (coming soon)  
 > ⏳ .NET (coming soon)
 
@@ -99,6 +99,75 @@ go test ./...
 ```
 
 Tests rely on Go’s standard tooling and include lightweight HTTP fixtures to validate signing logic and error handling. Set `OPERON_SDK_DEBUG=true` to enable verbose logs when needed.
+
+---
+
+## Java SDK (`com.operoncloud:operon-sdk`)
+
+The Java client brings the same ergonomics to JVM services targeting JDK 17 or 21.
+
+### Installation
+
+Add the dependency to your Maven project:
+
+```xml
+<dependency>
+  <groupId>com.operoncloud</groupId>
+  <artifactId>operon-sdk</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+Or with Gradle (Kotlin DSL):
+
+```kotlin
+dependencies {
+    implementation("com.operoncloud:operon-sdk:0.1.0-SNAPSHOT")
+}
+```
+
+### Quick Start
+
+```java
+import com.operoncloud.sdk.*;
+import java.time.Duration;
+
+public class Example {
+    public static void main(String[] args) throws Exception {
+        Config config = Config.builder()
+            .clientId(System.getenv("OPERON_CLIENT_ID"))
+            .clientSecret(System.getenv("OPERON_CLIENT_SECRET"))
+            // Optional overrides for non-production environments
+            // .baseUrl("https://api.dev.operon.cloud/client-api")
+            // .tokenUrl("https://auth.dev.operon.cloud/oauth2/token")
+            .httpTimeout(Duration.ofSeconds(10))
+            .build();
+
+        try (OperonClient client = new OperonClient(config)) {
+            client.init();
+
+            TransactionRequest request = TransactionRequest.builder()
+                .correlationId("lead-abc")
+                .interactionId("int-123")
+                .signature(new Signature("EdDSA", "BASE64_SIGNATURE", null))
+                .payload("{\"leadId\":\"lead-abc\"}")
+                .build();
+
+            Transaction txn = client.submitTransaction(request);
+            System.out.printf("Transaction %s status=%s%n", txn.id(), txn.status());
+        }
+    }
+}
+```
+
+### Building & Testing
+
+```bash
+cd java
+mvn test
+```
+
+The Maven build targets `--release 17`, ensuring compatibility with both JDK 17 and JDK 21 runtimes.
 
 ---
 
