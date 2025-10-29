@@ -1,6 +1,6 @@
 # Operon .NET SDK
 
-Modern .NET client (targeting **.NET 8**) for interacting with Operon Cloud services. The package mirrors the features offered by the Go, Java, and Node SDKs while embracing idiomatic .NET patterns such as dependency injection, `HttpClient`, and `System.Text.Json`.
+Modern .NET client (targeting **.NET 8**) for interacting with [Operon.Cloud](https://www.operon.cloud) services. The package mirrors the features offered by the Go, Java, and Node SDKs while embracing idiomatic .NET patterns such as dependency injection, `HttpClient`, and `System.Text.Json`.
 
 ## Project Structure
 
@@ -79,3 +79,7 @@ Console.WriteLine($"Transaction {response.Id} status={response.Status}");
 
 - Wire into CI for automated `dotnet test` and `dotnet pack` runs.
 - Publish pre-release builds to a private NuGet feed for early adopters.
+
+—
+
+Find SDKs for other languages and developer resources at https://www.operon.cloud/developers

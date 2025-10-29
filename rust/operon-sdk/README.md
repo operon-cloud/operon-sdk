@@ -1,6 +1,6 @@
 # Operon Rust SDK
 
-Idiomatic Rust client for the Operon platform targeting **Rust 1.75+**. The crate mirrors features available in the Go, Java, Node, and .NET SDKs while embracing async/await, `reqwest`, and serde for ergonomic usage.
+Idiomatic Rust client for the [Operon.Cloud](https://www.operon.cloud) platform targeting **Rust 1.75+**. The crate mirrors features available in the Go, Java, Node, and .NET SDKs while embracing async/await, `reqwest`, and serde for ergonomic usage.
 
 ## Usage
 
@@ -57,3 +57,7 @@ Rust 1.75.0 (locked via package metadata). The crate is tested against the lates
 ---
 
 Licensed under Apache-2.0.
+
+—
+
+Find other language SDKs and onboarding guides at https://www.operon.cloud/developers

@@ -161,3 +161,7 @@ go test ./...
 - Richer transaction lifecycle APIs (status polling, history).
 
 Feedback and pull requests are welcome while we shape the public SDK surface.
+
+—
+
+Part of the [Operon.Cloud](https://www.operon.cloud) developer platform. Explore more SDKs and resources at https://www.operon.cloud/developers

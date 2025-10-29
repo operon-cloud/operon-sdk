@@ -1,6 +1,6 @@
 # Operon Python SDK
 
-Asynchronous Python client for Operon Cloud services. Targets Python **3.10+** and mirrors the feature set provided in the Go, Java, Node, .NET, and Rust SDKs.
+Asynchronous Python client for [Operon.Cloud](https://www.operon.cloud) services. Targets Python **3.10+** and mirrors the feature set provided in the Go, Java, Node, .NET, and Rust SDKs.
 
 ## Installation
 
@@ -64,3 +64,7 @@ Python 3.10+.
 ---
 
 Licensed under Apache-2.0.
+
+—
+
+Discover more SDKs and guides at the Operon.Cloud Developers hub: https://www.operon.cloud/developers

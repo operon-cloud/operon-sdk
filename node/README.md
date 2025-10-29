@@ -1,6 +1,6 @@
 # Operon Node.js SDK
 
-Enterprise-ready JavaScript/TypeScript client for the Operon platform. This SDK mirrors the ergonomics of the Go and Java packages while embracing modern Node.js conventions (ES modules, strict TypeScript typings, fetch-based networking).
+Enterprise-ready JavaScript/TypeScript client for the [Operon.Cloud](https://www.operon.cloud) platform. This SDK mirrors the ergonomics of the Go and Java packages while embracing modern Node.js conventions (ES modules, strict TypeScript typings, fetch-based networking).
 
 ## Compatibility
 
@@ -67,3 +67,7 @@ node/
 ## License
 
 Apache-2.0 — see [LICENSE](../LICENSE).
+
+—
+
+For more resources and SDKs in other languages, visit Operon.Cloud Developers: https://www.operon.cloud/developers
