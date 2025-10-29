@@ -11,7 +11,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 
 > **SDK Coverage**  
 > ✅ Go (primary)  
-> ✅ Java (preview)  
+> ✅ Java (1.0.0)  
 > ⏳ Node.js (coming soon)  
 > ⏳ .NET (coming soon)
 
@@ -163,11 +163,11 @@ public class Example {
 ### Building & Testing
 
 ```bash
-cd java
-mvn test
+# Run unit tests (HTTP flows are mocked via embedded servers)
+mvn -f java/pom.xml test
 ```
 
-The Maven build targets `--release 17`, ensuring compatibility with both JDK 17 and JDK 21 runtimes.
+The Maven build targets `--release 17`, ensuring compatibility with both JDK 17 and JDK 21 runtimes and ships with coverage across token management, interaction caching, and transaction submission failure paths.
 
 ---
 
