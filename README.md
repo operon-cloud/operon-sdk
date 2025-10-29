@@ -12,7 +12,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 > **SDK Coverage**  
 > ✅ Go (1.1.2)  
 > ✅ Java (1.0.0)  
-> ⏳ Node.js (coming soon)  
+> ✅ Node.js (1.0.0)  
 > ⏳ .NET (coming soon)
 
 ---
@@ -168,6 +168,55 @@ mvn -f java/pom.xml test
 ```
 
 The Maven build targets `--release 17`, ensuring compatibility with both JDK 17 and JDK 21 runtimes and ships with coverage across token management, interaction caching, and transaction submission failure paths.
+
+---
+
+## Node.js SDK (`@operoncloud/operon-sdk`)
+
+The Node package delivers a modern, ESM-first client tailored for Node.js 20+ and TypeScript projects.
+
+### Installation
+
+```bash
+npm install @operoncloud/operon-sdk
+```
+
+### Quick Start
+
+```ts
+import { OperonClient, createConfig } from '@operoncloud/operon-sdk';
+
+const client = new OperonClient(
+  createConfig({
+    clientId: process.env.OPERON_CLIENT_ID!,
+    clientSecret: process.env.OPERON_CLIENT_SECRET!
+    // BaseURL and TokenURL default to production; override for dev/qa as needed.
+  })
+);
+
+await client.init();
+
+const txn = await client.submitTransaction({
+  correlationId: 'corr-123',
+  interactionId: 'int-abc',
+  payload: { foo: 'bar' }
+});
+
+console.log(`transaction ${txn.id} status=${txn.status}`);
+await client.close();
+```
+
+### Building & Testing
+
+```bash
+cd node
+npm install
+npm run lint
+npm test
+npm run build
+```
+
+The build emits ESM output with bundled type declarations, and the Vitest suite covers configuration validation, token lifecycle management, and transaction submission (including automatic signing and manual signature paths).
 
 ---
 

@@ -1,0 +1,61 @@
+{
+  "name": "@operoncloud/operon-sdk",
+  "version": "1.0.0",
+  "description": "Official Operon SDK for Node.js and TypeScript applications.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "lint": "eslint \"src/**/*.ts\"",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "operon",
+    "sdk",
+    "ledger",
+    "financial",
+    "typescript"
+  ],
+  "author": "Operon Cloud",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/operon-cloud/operon-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/operon-cloud/operon-sdk/issues"
+  },
+  "homepage": "https://operon.cloud",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@typescript-eslint/eslint-plugin": "^7.12.0",
+    "@typescript-eslint/parser": "^7.12.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-jsdoc": "^46.8.2",
+    "eslint-plugin-promise": "^6.1.1",
+    "prettier": "^3.3.2",
+    "rimraf": "^5.0.7",
+    "typescript": "^5.8.3",
+    "vitest": "^1.6.1"
+  }
+}
