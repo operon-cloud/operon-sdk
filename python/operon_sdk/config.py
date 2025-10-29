@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Configuration helpers for the Operon Python SDK."""
+
 from dataclasses import dataclass, field
 from typing import List, Optional
 from urllib.parse import urljoin, urlparse
@@ -70,6 +72,7 @@ class OperonConfig:
             raise ValueError("token_leeway cannot be negative")
 
     def api_url(self, path: str) -> str:
+        """Resolve an absolute API URL for the provided path."""
         if path.startswith("http://") or path.startswith("https://"):
             return path
         return urljoin(self.base_url, path)
@@ -81,6 +84,7 @@ class OperonConfig:
         client_id_env: str = "OPERON_CLIENT_ID",
         client_secret_env: str = "OPERON_CLIENT_SECRET",
     ) -> "OperonConfig":
+        """Build a configuration from environment variables."""
         import os
 
         client_id = os.environ.get(client_id_env)

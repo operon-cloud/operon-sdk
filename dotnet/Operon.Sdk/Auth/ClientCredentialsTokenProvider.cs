@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Operon.Sdk.Errors;
@@ -13,25 +14,46 @@ using Operon.Sdk.Models;
 
 namespace Operon.Sdk.Auth;
 
-internal interface ITokenProvider
+/// <summary>
+/// Defines a provider capable of returning OAuth access tokens for Operon APIs.
+/// </summary>
+public interface ITokenProvider
 {
+    /// <summary>
+    /// Retrieves a usable access token, refreshing it when the cached token is stale.
+    /// </summary>
+    /// <param name="cancellationToken">Token that cancels the asynchronous operation.</param>
+    /// <returns>The cached or freshly issued <see cref="AccessToken"/>.</returns>
     Task<AccessToken> GetTokenAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Clears any cached token, forcing the next request to fetch a fresh one.
+    /// </summary>
     void Clear();
 }
 
-internal sealed class ClientCredentialsTokenProvider : ITokenProvider
+/// <summary>
+/// <see cref="ITokenProvider"/> implementation that performs the OAuth2 client credentials flow.
+/// </summary>
+public sealed class ClientCredentialsTokenProvider : ITokenProvider
 {
     private readonly OperonConfig _config;
     private readonly HttpClient _httpClient;
     private AccessToken? _cachedToken;
     private readonly object _gate = new();
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ClientCredentialsTokenProvider"/> class.
+    /// </summary>
+    /// <param name="config">Runtime configuration for Operon endpoints and authentication.</param>
+    /// <param name="httpClient">HTTP client used when calling the authorization server.</param>
     public ClientCredentialsTokenProvider(OperonConfig config, HttpClient httpClient)
     {
         _config = config;
         _httpClient = httpClient;
     }
 
+    /// <inheritdoc />
     public async Task<AccessToken> GetTokenAsync(CancellationToken cancellationToken)
     {
         if (_cachedToken is { } cached && cached.ExpiresAt - _config.TokenLeeway > DateTimeOffset.UtcNow)
@@ -42,6 +64,7 @@ internal sealed class ClientCredentialsTokenProvider : ITokenProvider
         return await FetchFreshTokenAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
     public void Clear() => _cachedToken = null;
 
     private async Task<AccessToken> FetchFreshTokenAsync(CancellationToken cancellationToken)
@@ -181,14 +204,18 @@ internal sealed class ClientCredentialsTokenProvider : ITokenProvider
 
     private sealed record TokenResponse
     {
+        [JsonPropertyName("access_token")]
         public string? AccessToken { get; init; }
             = string.Empty;
 
+        [JsonPropertyName("expires_in")]
         public int ExpiresIn { get; init; }
             = 60;
 
+        [JsonPropertyName("token_type")]
         public string TokenType { get; init; } = "Bearer";
 
+        [JsonPropertyName("scope")]
         public string? Scope { get; init; } = string.Empty;
     }
 }

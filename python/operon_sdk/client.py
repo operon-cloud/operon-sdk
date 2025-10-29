@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""High-level asynchronous client for interacting with Operon APIs."""
+
 import asyncio
 import json
 from datetime import datetime, timezone
@@ -25,6 +27,8 @@ PARTICIPANTS_ENDPOINT = "v1/participants"
 
 
 class OperonClient:
+    """Convenience wrapper that handles auth, catalog lookups, and transaction submission."""
+
     def __init__(
         self,
         config: OperonConfig,
@@ -32,6 +36,7 @@ class OperonClient:
         client: Optional[httpx.AsyncClient] = None,
         token_provider: Optional[ClientCredentialsTokenProvider] = None,
     ) -> None:
+        """Initialise the client with optional custom HTTP and token handling."""
         self._config = config
         self._client = client or httpx.AsyncClient(timeout=config.http_timeout)
         self._token_provider = token_provider or ClientCredentialsTokenProvider(
@@ -42,18 +47,23 @@ class OperonClient:
         self._catalog_lock = asyncio.Lock()
 
     async def init(self) -> None:
+        """Eagerly fetch an access token so authentication errors surface quickly."""
         await self._token_provider.get_token()
 
     async def aclose(self) -> None:
+        """Close the underlying HTTP client."""
         await self._client.aclose()
 
     async def __aenter__(self) -> "OperonClient":
+        """Support usage as an async context manager."""
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
+        """Ensure resources are released when the async context exits."""
         await self.aclose()
 
     async def submit_transaction(self, request: TransactionRequest) -> Transaction:
+        """Submit a transaction, auto-populating metadata and signatures when possible."""
         if not isinstance(request, TransactionRequest):
             raise ValidationError("request must be TransactionRequest")
 

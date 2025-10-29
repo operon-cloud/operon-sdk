@@ -48,8 +48,8 @@ public sealed class ClientCredentialsTokenProviderTests
     {
         var config = new OperonConfig("client", "secret", tokenLeeway: TimeSpan.FromSeconds(5));
         var handler = new StubHttpMessageHandler();
-        handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new { access_token = BuildToken(new { }), expires_in = 1 }));
-        handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new { access_token = BuildToken(new { }), expires_in = 120 }));
+        handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new { access_token = BuildToken(new { nonce = "first" }), expires_in = 1 }));
+        handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new { access_token = BuildToken(new { nonce = "second" }), expires_in = 120 }));
 
         using var httpClient = new HttpClient(handler)
         {

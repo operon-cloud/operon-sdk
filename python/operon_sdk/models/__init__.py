@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Pydantic models used throughout the Operon Python SDK."""
+
 from base64 import urlsafe_b64encode
 from hashlib import sha256
 from typing import List, Optional
@@ -8,6 +10,8 @@ from pydantic import BaseModel, Field
 
 
 class Signature(BaseModel):
+    """Digital signature metadata attached to a transaction payload."""
+
     algorithm: str = Field(default="EdDSA")
     value: str
     key_id: Optional[str] = Field(default=None, alias="keyId")
@@ -18,6 +22,8 @@ class Signature(BaseModel):
 
 
 class Transaction(BaseModel):
+    """Transaction record returned by the Operon API."""
+
     id: str
     correlation_id: str = Field(alias="correlationId")
     channel_id: str = Field(alias="channelId")
@@ -37,6 +43,8 @@ class Transaction(BaseModel):
 
 
 class InteractionSummary(BaseModel):
+    """Lightweight description of a configured interaction."""
+
     id: str
     channel_id: str = Field(alias="channelId")
     source_participant_id: str = Field(alias="sourceParticipantId")
@@ -50,11 +58,15 @@ class InteractionSummary(BaseModel):
 
 
 class ParticipantSummary(BaseModel):
+    """Participant directory entry used when mapping IDs to DIDs."""
+
     id: str
     did: str
 
 
 class TransactionRequest(BaseModel):
+    """Composable request payload for creating a transaction."""
+
     correlation_id: str
     interaction_id: str
     channel_id: Optional[str] = None
@@ -73,6 +85,7 @@ class TransactionRequest(BaseModel):
 
     @classmethod
     def new(cls, correlation_id: str, interaction_id: str) -> "TransactionRequest":
+        """Construct a request with the required identifiers."""
         if not correlation_id.strip():
             raise ValueError("correlation_id is required")
         if not interaction_id.strip():
@@ -104,6 +117,7 @@ class TransactionRequest(BaseModel):
         return self
 
     def compute_payload(self) -> tuple[Optional[str], str]:
+        """Return a base64 payload body (if provided) and deterministic hash."""
         if self.payload_bytes:
             digest = sha256(self.payload_bytes).digest()
             encoded_hash = urlsafe_b64encode(digest).decode().rstrip("=")

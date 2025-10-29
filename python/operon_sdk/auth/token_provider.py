@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Authentication helpers for the Operon Python SDK."""
+
 import asyncio
 import base64
 import json
@@ -28,6 +30,8 @@ from ..errors import ApiError, OperonError, TransportError, ValidationError
 
 @dataclass(slots=True)
 class AccessToken:
+    """Container for issued OAuth tokens and their key claims."""
+
     value: str
     expires_at: datetime
     participant_did: Optional[str]
@@ -35,13 +39,17 @@ class AccessToken:
 
 
 class ClientCredentialsTokenProvider:
+    """Fetches and caches access tokens using the client credentials flow."""
+
     def __init__(self, config: OperonConfig, *, client: Optional[httpx.AsyncClient] = None) -> None:
+        """Create a token provider with optional custom HTTP client."""
         self._config = config
         self._client = client or httpx.AsyncClient(timeout=config.http_timeout)
         self._lock = asyncio.Lock()
         self._cached: Optional[AccessToken] = None
 
     async def get_token(self) -> AccessToken:
+        """Return a valid access token, refreshing when the cached token is near expiry."""
         async with self._lock:
             if self._cached and self._cached.expires_at - timedelta(
                 seconds=self._config.token_leeway
@@ -52,6 +60,7 @@ class ClientCredentialsTokenProvider:
             return token
 
     async def clear(self) -> None:
+        """Purge the cached token so the next request forces a refresh."""
         async with self._lock:
             self._cached = None
 

@@ -1,3 +1,6 @@
+"""Error hierarchy used by the Operon Python SDK."""
+
+
 class OperonError(Exception):
     """Base error for the Operon SDK."""
 

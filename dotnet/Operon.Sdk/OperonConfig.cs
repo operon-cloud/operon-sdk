@@ -8,9 +8,28 @@ namespace Operon.Sdk;
 /// </summary>
 public sealed class OperonConfig
 {
+    /// <summary>
+    /// Default API base URI used when none is supplied.
+    /// </summary>
     public static readonly Uri DefaultBaseUri = new("https://api.operon.cloud/client-api/");
+
+    /// <summary>
+    /// Default OAuth2 token endpoint used for client credential flows.
+    /// </summary>
     public static readonly Uri DefaultTokenUri = new("https://auth.operon.cloud/oauth2/token");
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OperonConfig"/> class.
+    /// </summary>
+    /// <param name="clientId">The issued client identifier.</param>
+    /// <param name="clientSecret">The issued client secret.</param>
+    /// <param name="baseUri">Optional override for the Operon API base URI.</param>
+    /// <param name="tokenUri">Optional override for the token endpoint URI.</param>
+    /// <param name="scope">Optional OAuth scope request.</param>
+    /// <param name="audience">Optional OAuth audience values.</param>
+    /// <param name="httpTimeout">Optional HTTP timeout for outbound calls.</param>
+    /// <param name="tokenLeeway">Time window before expiry to refresh cached tokens.</param>
+    /// <param name="disableSelfSign">When true, disables automatic request signing.</param>
     public OperonConfig(
         string clientId,
         string clientSecret,
@@ -77,8 +96,16 @@ public sealed class OperonConfig
     }
 }
 
+/// <summary>
+/// Extension helpers for working with <see cref="Uri"/> values.
+/// </summary>
 internal static class UriExtensions
 {
+    /// <summary>
+    /// Ensures the supplied URI ends with a trailing slash.
+    /// </summary>
+    /// <param name="uri">The URI to normalize.</param>
+    /// <returns>A URI guaranteed to contain a trailing slash.</returns>
     public static Uri EnsureTrailingSlash(this Uri uri)
     {
         if (!uri.AbsoluteUri.EndsWith("/", StringComparison.Ordinal))

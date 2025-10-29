@@ -37,6 +37,12 @@ public sealed class OperonClient : IAsyncDisposable
     private AccessToken? _cachedToken;
     private bool _disposed;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OperonClient"/> class.
+    /// </summary>
+    /// <param name="config">Client configuration describing endpoints and authentication.</param>
+    /// <param name="httpClient">Optional custom <see cref="HttpClient"/> instance.</param>
+    /// <param name="tokenProvider">Optional token provider; defaults to <see cref="ClientCredentialsTokenProvider"/>.</param>
     public OperonClient(OperonConfig config, HttpClient? httpClient = null, ITokenProvider? tokenProvider = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
@@ -47,6 +53,8 @@ public sealed class OperonClient : IAsyncDisposable
     /// <summary>
     /// Preemptively acquires an access token. Optional but recommended to surface errors early.
     /// </summary>
+    /// <param name="cancellationToken">Token used to cancel the asynchronous operation.</param>
+    /// <returns>A task that completes once initialization finishes.</returns>
     public async Task InitAsync(CancellationToken cancellationToken = default)
     {
         _cachedToken = await _tokenProvider.GetTokenAsync(cancellationToken).ConfigureAwait(false);
@@ -55,6 +63,13 @@ public sealed class OperonClient : IAsyncDisposable
     /// <summary>
     /// Submit a transaction to Operon, applying automatic signing when enabled.
     /// </summary>
+    /// <param name="request">Transaction details to submit.</param>
+    /// <param name="cancellationToken">Token used to cancel the asynchronous operation.</param>
+    /// <returns>The persisted <see cref="Transaction"/> metadata.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="request"/> is null.</exception>
+    /// <exception cref="ValidationException">Thrown when required fields are missing.</exception>
+    /// <exception cref="OperonApiException">Thrown when the Operon API returns an error.</exception>
+    /// <exception cref="TransportException">Thrown when a transport issue prevents submission.</exception>
     public async Task<Transaction> SubmitTransactionAsync(TransactionRequest request, CancellationToken cancellationToken = default)
     {
         if (request is null)
@@ -120,6 +135,8 @@ public sealed class OperonClient : IAsyncDisposable
     /// <summary>
     /// Returns cached interaction catalogue items (loads on first access).
     /// </summary>
+    /// <param name="cancellationToken">Token used to cancel the asynchronous operation.</param>
+    /// <returns>Known interactions accessible to the client.</returns>
     public async Task<IReadOnlyCollection<InteractionSummary>> GetInteractionsAsync(CancellationToken cancellationToken = default)
     {
         if (!_registry.Interactions.Any())
@@ -132,6 +149,8 @@ public sealed class OperonClient : IAsyncDisposable
     /// <summary>
     /// Returns cached participant directory (loads on first access).
     /// </summary>
+    /// <param name="cancellationToken">Token used to cancel the asynchronous operation.</param>
+    /// <returns>Participants available to the client.</returns>
     public async Task<IReadOnlyCollection<ParticipantSummary>> GetParticipantsAsync(CancellationToken cancellationToken = default)
     {
         if (!_registry.Participants.Any())
@@ -141,6 +160,10 @@ public sealed class OperonClient : IAsyncDisposable
         return _registry.Participants;
     }
 
+    /// <summary>
+    /// Disposes the underlying HTTP client and token provider resources.
+    /// </summary>
+    /// <returns>A task representing completion of the dispose operation.</returns>
     public async ValueTask DisposeAsync()
     {
         if (_disposed)
@@ -187,6 +210,14 @@ public sealed class OperonClient : IAsyncDisposable
 
         if (interaction is null)
         {
+            request.SourceDid = Coalesce(request.SourceDid, token.ParticipantDid);
+            if (!string.IsNullOrWhiteSpace(request.ChannelId)
+                && !string.IsNullOrWhiteSpace(request.SourceDid)
+                && !string.IsNullOrWhiteSpace(request.TargetDid))
+            {
+                return;
+            }
+
             throw new ValidationException($"Interaction '{request.InteractionId}' not found.");
         }
 

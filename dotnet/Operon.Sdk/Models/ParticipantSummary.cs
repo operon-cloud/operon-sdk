@@ -5,6 +5,13 @@ namespace Operon.Sdk.Models;
 /// </summary>
 public sealed class ParticipantSummary
 {
+    /// <summary>
+    /// Participant identifier referenced by interactions.
+    /// </summary>
     public string Id { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Decentralized identifier belonging to the participant.
+    /// </summary>
     public string Did { get; init; } = string.Empty;
 }
