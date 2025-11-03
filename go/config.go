@@ -69,8 +69,14 @@ func (c *Config) Validate() error {
 		c.TokenLeeway = defaultTokenLeeway
 	}
 
-	if strings.TrimSpace(c.SigningAlgorithm) == "" {
-		c.SigningAlgorithm = AlgorithmEd25519
+	alg := strings.TrimSpace(c.SigningAlgorithm)
+	if alg == "" {
+		alg = AlgorithmEd25519
+	}
+	if canonical, ok := canonicalSigningAlgorithm(alg); ok {
+		c.SigningAlgorithm = canonical
+	} else {
+		return fmt.Errorf("unsupported SigningAlgorithm %s", alg)
 	}
 
 	return nil

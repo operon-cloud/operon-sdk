@@ -10,7 +10,11 @@ import (
 	"time"
 )
 
-const AlgorithmEd25519 = "EdDSA"
+const (
+	AlgorithmEd25519 = "EdDSA"
+	AlgorithmES256   = "ES256"
+	AlgorithmES256K  = "ES256K"
+)
 
 // Signature captures the digital signature metadata required by the Operon client API.
 type Signature struct {
@@ -155,6 +159,25 @@ func validatePayloadHashFormat(hash string) error {
 		return fmt.Errorf("payload hash must be base64url encoded: %w", err)
 	}
 	return nil
+}
+
+var signingAlgorithms = []string{
+	AlgorithmEd25519,
+	AlgorithmES256,
+	AlgorithmES256K,
+}
+
+func canonicalSigningAlgorithm(value string) (string, bool) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", false
+	}
+	for _, candidate := range signingAlgorithms {
+		if strings.EqualFold(trimmed, candidate) {
+			return candidate, true
+		}
+	}
+	return "", false
 }
 
 // MarshalJSON ensures timestamp zero values are omitted when serialising TransactionRequest (useful for tests/examples).
