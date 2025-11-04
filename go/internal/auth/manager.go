@@ -198,7 +198,7 @@ func (m *ClientCredentialsManager) fetchToken(ctx context.Context) (Token, error
 		expiresIn = time.Minute
 	}
 
-	claims := extractTokenClaims(accessToken)
+	claims := DecodeTokenClaims(accessToken)
 
 	token := Token{
 		AccessToken:    accessToken,
@@ -235,11 +235,8 @@ type tokenResponse struct {
 	Scope       string `json:"scope"`
 }
 
-func extractParticipantDID(token string) string {
-	return extractTokenClaims(token).ParticipantDID
-}
-
-type tokenClaims struct {
+// Claims captures token fields used across the SDK.
+type Claims struct {
 	ParticipantDID string   `json:"participant_did"`
 	ChannelID      string   `json:"channel_id"`
 	CustomerID     string   `json:"customer_id"`
@@ -251,12 +248,14 @@ type tokenClaims struct {
 	MemberID       string   `json:"member_id"`
 	SessionID      string   `json:"session_id"`
 	OrgID          string   `json:"org_id"`
+	ExpiresAt      int64    `json:"exp"`
 }
 
-func extractTokenClaims(token string) tokenClaims {
+// DecodeTokenClaims decodes the JWT payload and returns known Operon claims.
+func DecodeTokenClaims(token string) Claims {
 	parts := strings.Split(token, ".")
 	if len(parts) < 2 {
-		return tokenClaims{}
+		return Claims{}
 	}
 
 	decode := func(seg string) ([]byte, error) {
@@ -268,12 +267,16 @@ func extractTokenClaims(token string) tokenClaims {
 
 	payload, err := decode(parts[1])
 	if err != nil {
-		return tokenClaims{}
+		return Claims{}
 	}
 
-	var claims tokenClaims
+	var claims Claims
 	if err := json.Unmarshal(payload, &claims); err != nil {
-		return tokenClaims{}
+		return Claims{}
 	}
 	return claims
+}
+
+func extractParticipantDID(token string) string {
+	return DecodeTokenClaims(token).ParticipantDID
 }
