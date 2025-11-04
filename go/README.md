@@ -2,12 +2,13 @@
 
 The Operon Go SDK provides a lightweight client for machine-to-machine (M2M)
 workloads that need to interact with the Operon Platform. This initial preview
-focuses on three core capabilities:
+focuses on four core capabilities:
 
 1. Obtaining a Platform Access Token (PAT) using client-credentials (M2M).
 2. Submitting transactions through the public Client API and receiving the
    resulting transaction record.
-3. Generating and validating Operon signature headers for outbound and inbound
+3. Discovering channel interactions and participants without leaving the SDK.
+4. Generating and validating Operon signature headers for outbound and inbound
    API calls (ID.Operon flows).
 
 > **Status:** Preview – APIs are subject to change while the platform’s public
@@ -60,6 +61,8 @@ With an initialised client you can choose the scenario that matches your workloa
 
 - [Submit a transaction to the Client API](../docs/go/transactions.md)
   - Learn how to construct a `TransactionRequest`, leverage interaction discovery, and handle common response codes.
+- [Discover channel interactions and participants](../docs/go/discovery.md)
+  - Load the authenticated channel’s catalogue without hand-crafting HTTP requests or managing PAT headers yourself.
 - [Sign outgoing API calls](../docs/go/signing.md)
   - Shows how to request managed signatures, assemble the required Operon headers, and attach them to any HTTP request.
 - [Validate incoming API call signatures](../docs/go/validation.md)

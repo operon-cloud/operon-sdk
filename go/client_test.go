@@ -516,16 +516,22 @@ func TestValidateSignatureHeadersFallsBackToDemoEndpoint(t *testing.T) {
 	require.Equal(t, "legacy", result.Message)
 }
 
-func newToken(participantDID string) string {
+func newTokenWithClaims(claims map[string]any) string {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
-	payload := base64.RawURLEncoding.EncodeToString([]byte(fmt.Sprintf(`{"participant_did":"%s"}`, participantDID)))
+	body, err := json.Marshal(claims)
+	if err != nil {
+		panic(fmt.Sprintf("marshal claims: %v", err))
+	}
+	payload := base64.RawURLEncoding.EncodeToString(body)
 	return header + "." + payload + ".signature"
 }
 
+func newToken(participantDID string) string {
+	return newTokenWithClaims(map[string]any{"participant_did": participantDID})
+}
+
 func newTokenWithoutParticipantDID() string {
-	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
-	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"client_id":"demo"}`))
-	return header + "." + payload + ".signature"
+	return newTokenWithClaims(map[string]any{"client_id": "demo"})
 }
 
 func TestClientParticipantsReturnsCopy(t *testing.T) {
