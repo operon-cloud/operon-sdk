@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -129,4 +130,99 @@ func TestClientGetChannelInteractionsErrorsWithoutChannel(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "channel ID is required")
 	require.Equal(t, "/token", pathCalled)
+}
+
+func TestFetchChannelInteractionsUsesPATClaim(t *testing.T) {
+	pat := newTokenWithClaims(map[string]any{
+		"participant_did": "did:example:source",
+		"channel_id":      "channel-xyz",
+	})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/channels/channel-xyz/interactions", r.URL.Path)
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "Bearer "+pat, r.Header.Get("Authorization"))
+
+		payload := operon.ChannelInteractionsResponse{
+			Interactions: []operon.ChannelInteraction{
+				{
+					ID:        "interaction-xyz",
+					Status:    "active",
+					CreatedAt: time.Now().UTC(),
+					UpdatedAt: time.Now().UTC(),
+				},
+			},
+			TotalCount: 1,
+			Page:       1,
+			PageSize:   1000,
+			HasMore:    false,
+		}
+		require.NoError(t, json.NewEncoder(w).Encode(payload))
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	cfg := operon.ChannelDataConfig{
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	}
+
+	resp, err := operon.FetchChannelInteractions(ctx, cfg, pat)
+	require.NoError(t, err)
+	require.Len(t, resp.Interactions, 1)
+	require.Equal(t, "interaction-xyz", resp.Interactions[0].ID)
+}
+
+func TestFetchChannelParticipantsAllowsOverride(t *testing.T) {
+	pat := newTokenWithoutParticipantDID()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/channels/channel-override/participants", r.URL.Path)
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "Bearer "+pat, r.Header.Get("Authorization"))
+
+		payload := operon.ChannelParticipantsResponse{
+			Participants: []operon.ChannelParticipant{
+				{
+					ID:        "participant-override",
+					DID:       "did:example:override",
+					Status:    "active",
+					CreatedAt: time.Now().UTC(),
+					UpdatedAt: time.Now().UTC(),
+				},
+			},
+			TotalCount: 1,
+			Page:       1,
+			PageSize:   1000,
+			HasMore:    false,
+		}
+		require.NoError(t, json.NewEncoder(w).Encode(payload))
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	cfg := operon.ChannelDataConfig{
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	}
+
+	resp, err := operon.FetchChannelParticipants(ctx, cfg, pat, "channel-override")
+	require.NoError(t, err)
+	require.Len(t, resp.Participants, 1)
+	require.Equal(t, "participant-override", resp.Participants[0].ID)
+}
+
+func TestFetchChannelInteractionsFailsWithoutChannel(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	cfg := operon.ChannelDataConfig{}
+
+	_, err := operon.FetchChannelInteractions(ctx, cfg, newTokenWithoutParticipantDID())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "channel ID is required")
 }

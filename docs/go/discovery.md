@@ -28,6 +28,17 @@ resp, err := client.GetChannelInteractions(ctx, "chnl-123")
 
 The response mirrors `GET /v1/channels/{channelId}/interactions` from the client API and includes pagination fields should you need them (`totalCount`, `page`, `pageSize`, `hasMore`).
 
+Server-side components that already hold a PAT (for example, sandbox-api after login) can stay SDK-only as well:
+
+```go
+cfg := operon.ChannelDataConfig{
+    BaseURL:    "https://api.operon.cloud/client-api",
+    HTTPClient: http.DefaultClient,
+}
+
+resp, err := operon.FetchChannelInteractions(ctx, cfg, patFromCookie)
+```
+
 ## Fetch channel participants
 
 ```go
@@ -48,3 +59,9 @@ resp, err := client.GetChannelParticipants(ctx, "chnl-123")
 ```
 
 Both helpers infer the PAT to send on the request, handle API error decoding, and keep the SDK’s channel cache consistent. This keeps your service fully SDK-driven while aligning with Operon’s auth standards.
+
+And the PAT-centric helper mirrors the interactions example:
+
+```go
+resp, err := operon.FetchChannelParticipants(ctx, cfg, patFromCookie)
+```

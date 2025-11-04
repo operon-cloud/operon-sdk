@@ -62,7 +62,7 @@ With an initialised client you can choose the scenario that matches your workloa
 - [Submit a transaction to the Client API](../docs/go/transactions.md)
   - Learn how to construct a `TransactionRequest`, leverage interaction discovery, and handle common response codes.
 - [Discover channel interactions and participants](../docs/go/discovery.md)
-  - Load the authenticated channel’s catalogue without hand-crafting HTTP requests or managing PAT headers yourself.
+  - Load the authenticated channel’s catalogue via the SDK client or call helper functions that operate directly on the PAT you already have.
 - [Sign outgoing API calls](../docs/go/signing.md)
   - Shows how to request managed signatures, assemble the required Operon headers, and attach them to any HTTP request.
 - [Validate incoming API call signatures](../docs/go/validation.md)
