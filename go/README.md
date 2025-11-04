@@ -67,6 +67,7 @@ With an initialised client you can choose the scenario that matches your workloa
   - Shows how to request managed signatures, assemble the required Operon headers, and attach them to any HTTP request.
 - [Validate incoming API call signatures](../docs/go/validation.md)
   - Walks through capturing headers, verifying the payload hash, and invoking the verification endpoint (with automatic fallback).
+- PAT-only helpers: use `SignHashWithPAT` and `SubmitTransactionWithPAT` when you already have a sandbox-issued PAT and want to avoid storing client secrets.
 
 Both guides include full code samples, error-handling tips, and troubleshooting checklists.
 

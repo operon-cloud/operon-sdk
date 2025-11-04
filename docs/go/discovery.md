@@ -65,3 +65,47 @@ And the PAT-centric helper mirrors the interactions example:
 ```go
 resp, err := operon.FetchChannelParticipants(ctx, cfg, patFromCookie)
 ```
+
+## Sign payload hashes with a PAT
+
+```go
+cfg := operon.ClientAPIConfig{
+    BaseURL:    "https://api.operon.cloud/client-api",
+    HTTPClient: http.DefaultClient,
+}
+
+signature, err := operon.SignHashWithPAT(ctx, cfg, patFromCookie, payloadHash, "ES256")
+if err != nil {
+    log.Fatalf("sign payload: %v", err)
+}
+
+log.Printf("signature %s via %s", signature.Value, signature.Algorithm)
+```
+
+## Submit transactions with a PAT
+
+```go
+bytes, err := operon.DecodePayloadBase64(payloadDataB64)
+if err != nil {
+    log.Fatalf("decode payload: %v", err)
+}
+
+req := operon.TransactionRequest{
+    CorrelationID: correlationID,
+    ChannelID:     channelID,
+    InteractionID: interactionID,
+    Timestamp:     time.Now().UTC(),
+    SourceDID:     sourceDID,
+    TargetDID:     targetDID,
+    Signature:     signature,
+    Payload:       bytes,
+    PayloadHash:   payloadHash,
+}
+
+transaction, err := operon.SubmitTransactionWithPAT(ctx, cfg, patFromCookie, req)
+if err != nil {
+    log.Fatalf("submit transaction: %v", err)
+}
+
+log.Printf("transaction stored as %s", transaction.ID)
+```

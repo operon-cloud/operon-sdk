@@ -63,12 +63,6 @@ type ChannelParticipantsResponse struct {
 	HasMore      bool                 `json:"hasMore"`
 }
 
-// ChannelDataConfig configures direct channel discovery helpers that operate on a PAT without instantiating a Client.
-type ChannelDataConfig struct {
-	BaseURL    string
-	HTTPClient HTTPClient
-}
-
 // GetChannelInteractions returns the interactions available to the authenticated channel. The optional channelID argument
 // allows overriding the token-bound channel when working with broader credentials.
 func (c *Client) GetChannelInteractions(ctx context.Context, channelID ...string) (ChannelInteractionsResponse, error) {
@@ -203,23 +197,14 @@ func fetchChannelDataset(ctx context.Context, cfg ChannelDataConfig, pat string,
 		return nil, errors.New("pat is required")
 	}
 
-	baseURL := strings.TrimSpace(cfg.BaseURL)
-	if baseURL == "" {
-		baseURL = DefaultBaseURL
-	}
-	baseURL = strings.TrimRight(baseURL, "/")
-
-	httpClient := cfg.HTTPClient
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: DefaultHTTPTimeout}
-	}
+	normalized, httpClient := normalizeClientAPIConfig(cfg)
 
 	channel, err := resolveChannelIDFromPAT(pat, override...)
 	if err != nil {
 		return nil, err
 	}
 
-	endpoint := fmt.Sprintf("%s/v1/channels/%s/%s", baseURL, url.PathEscape(channel), resource)
+	endpoint := fmt.Sprintf("%s/v1/channels/%s/%s", normalized.BaseURL, url.PathEscape(channel), resource)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
