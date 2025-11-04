@@ -30,6 +30,8 @@ type SessionInfo struct {
 	ChannelID        string
 	WorkspaceID      string
 	ParticipantDID   string
+	ParticipantID    string
+	ClientID         string
 	SessionID        string
 	ExpiresAt        time.Time
 	ExpiresInSeconds int
@@ -101,7 +103,7 @@ func ValidateSession(ctx context.Context, cfg SessionValidationConfig, pat strin
 		}
 	}
 
-	return SessionInfo{
+	result := SessionInfo{
 		UserID:           payload.UserID,
 		Email:            payload.Email,
 		Name:             payload.Name,
@@ -111,8 +113,25 @@ func ValidateSession(ctx context.Context, cfg SessionValidationConfig, pat strin
 		ChannelID:        claims.ChannelID,
 		WorkspaceID:      claims.WorkspaceID,
 		ParticipantDID:   claims.ParticipantDID,
+		ParticipantID:    claims.ParticipantID,
+		ClientID:         firstNonEmpty(claims.ClientID, claims.AuthorizedParty),
 		SessionID:        claims.SessionID,
 		ExpiresAt:        expiresAt,
 		ExpiresInSeconds: expiresIn,
-	}, nil
+	}
+
+	if result.FeatureFlags == nil {
+		result.FeatureFlags = map[string]interface{}{}
+	}
+
+	return result, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }

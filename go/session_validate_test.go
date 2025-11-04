@@ -14,6 +14,9 @@ func TestValidateSessionSuccess(t *testing.T) {
 	exp := time.Now().Add(15 * time.Minute).Unix()
 	pat := makeTestPAT(map[string]interface{}{
 		"participant_did": "did:operon:demo",
+		"participant_id":  "prtp-123",
+		"client_id":       "client-123",
+		"azp":             "app-123",
 		"channel_id":      "chnl-123",
 		"customer_id":     "cust-123",
 		"workspace_id":    "wksp-123",
@@ -54,8 +57,11 @@ func TestValidateSessionSuccess(t *testing.T) {
 	if info.ChannelID != "chnl-123" || info.ParticipantDID != "did:operon:demo" {
 		t.Fatalf("expected channel and DID from claims, got %#v", info)
 	}
-	if info.SessionID != "sess-123" {
+	if info.SessionID != "sess-123" || info.ParticipantID != "prtp-123" {
 		t.Fatalf("unexpected session id: %s", info.SessionID)
+	}
+	if info.ClientID != "client-123" {
+		t.Fatalf("expected client id, got %s", info.ClientID)
 	}
 	if info.ExpiresAt.IsZero() {
 		t.Fatalf("expected expiry to be populated")
