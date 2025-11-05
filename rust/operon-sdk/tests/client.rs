@@ -28,26 +28,34 @@ async fn submit_transaction_self_sign() {
 
     // interactions
     Mock::given(method("GET"))
-        .and(path("/v1/interactions"))
+        .and(path("/v1/channels/chnl-1/interactions"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "data": [{
+            "interactions": [{
                 "id": "int-123",
                 "channelId": "chnl-1",
                 "sourceParticipantId": "part-1",
                 "targetParticipantId": "part-2"
-            }]
+            }],
+            "totalCount": 1,
+            "page": 1,
+            "pageSize": 50,
+            "hasMore": false
         })))
         .mount(&server)
         .await;
 
     // participants
     Mock::given(method("GET"))
-        .and(path("/v1/participants"))
+        .and(path("/v1/channels/chnl-1/participants"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "data": [
+            "participants": [
                 { "id": "part-1", "did": "did:test:123" },
                 { "id": "part-2", "did": "did:test:456" }
-            ]
+            ],
+            "totalCount": 2,
+            "page": 1,
+            "pageSize": 50,
+            "hasMore": false
         })))
         .mount(&server)
         .await;
@@ -120,7 +128,7 @@ async fn submit_transaction_manual_signature() {
     Mock::given(method("POST"))
         .and(path("/oauth/token"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "access_token": build_token(serde_json::json!({"participant_did":"did:test:777"})),
+            "access_token": build_token(serde_json::json!({"participant_did":"did:test:777","channel_id":"chnl-9"})),
             "expires_in": 300
         })))
         .expect(1)
@@ -128,14 +136,26 @@ async fn submit_transaction_manual_signature() {
         .await;
 
     Mock::given(method("GET"))
-        .and(path("/v1/interactions"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"data": []})))
+        .and(path("/v1/channels/chnl-9/interactions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "interactions": [],
+            "totalCount": 0,
+            "page": 1,
+            "pageSize": 50,
+            "hasMore": false
+        })))
         .mount(&server)
         .await;
 
     Mock::given(method("GET"))
-        .and(path("/v1/participants"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"data": []})))
+        .and(path("/v1/channels/chnl-9/participants"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "participants": [],
+            "totalCount": 0,
+            "page": 1,
+            "pageSize": 50,
+            "hasMore": false
+        })))
         .mount(&server)
         .await;
 

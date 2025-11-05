@@ -12,7 +12,14 @@ export type {
   TransactionRequest,
   Transaction,
   Signature,
+  OperonHeaders,
+  SignatureValidationResult,
   InteractionSummary,
-  ParticipantSummary
+  ParticipantSummary,
+  ChannelInteraction,
+  ChannelInteractionsResponse,
+  ChannelParticipant,
+  ChannelParticipantsResponse,
+  SessionInfo
 } from './types.js';
 export { ValidationError, ApiError, TransportError, OperonSdkError } from './errors.js';

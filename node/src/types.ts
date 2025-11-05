@@ -15,6 +15,25 @@ export interface Signature {
 }
 
 /**
+ * HTTP headers required when exchanging Operon-signed payloads.
+ */
+export interface OperonHeaders {
+  [key: string]: string;
+}
+
+/**
+ * Result returned by the Operon signature validation endpoint.
+ */
+export interface SignatureValidationResult {
+  status: string;
+  message?: string;
+  did: string;
+  payloadHash: string;
+  algorithm: string;
+  keyId: string;
+}
+
+/**
  * Client-facing shape for submitting transactions to Operon.
  */
 export interface TransactionRequest {
@@ -79,6 +98,69 @@ export interface InteractionSummary {
 export interface ParticipantSummary {
   id: string;
   did: string;
+}
+
+export interface ChannelInteraction {
+  id: string;
+  name?: string;
+  description?: string;
+  status?: string;
+  sourceParticipantId: string;
+  targetParticipantId: string;
+  channels?: string[];
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+  version?: number;
+  channelId?: string;
+}
+
+export interface ChannelInteractionsResponse {
+  interactions: ChannelInteraction[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export interface ChannelParticipant {
+  id: string;
+  did: string;
+  name?: string;
+  description?: string;
+  url?: string;
+  status?: string;
+  type?: string;
+  customerId?: string;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+  version?: number;
+}
+
+export interface ChannelParticipantsResponse {
+  participants: ChannelParticipant[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export interface SessionInfo {
+  userId?: string;
+  email?: string;
+  name?: string;
+  customerId?: string;
+  roles: string[];
+  featureFlags: Record<string, unknown>;
+  channelId?: string;
+  workspaceId?: string;
+  participantDid?: string;
+  participantId?: string;
+  clientId?: string;
+  sessionId?: string;
+  expiresAt?: Date;
+  expiresInSeconds?: number;
 }
 
 export interface TokenContext {

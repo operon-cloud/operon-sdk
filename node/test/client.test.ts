@@ -50,12 +50,18 @@ describe('OperonClient', () => {
         });
       }
 
-      if (url === `${BASE_URL}/v1/interactions`) {
-        return buildResponse({ data: interactions });
+      if (url === `${BASE_URL}/v1/channels/chnl-cached/interactions`) {
+        return buildResponse({ interactions, totalCount: interactions.length, page: 1, pageSize: 50, hasMore: false });
       }
 
-      if (url === `${BASE_URL}/v1/participants`) {
-        return buildResponse({ data: participants });
+      if (url === `${BASE_URL}/v1/channels/chnl-cached/participants`) {
+        return buildResponse({
+          participants,
+          totalCount: participants.length,
+          page: 1,
+          pageSize: 50,
+          hasMore: false
+        });
       }
 
       if (url === `${BASE_URL}/v1/dids/self/sign`) {
@@ -106,8 +112,59 @@ describe('OperonClient', () => {
     const transactionCall = fetchCalls.find((call) => call.url.endsWith('/v1/transactions'));
     expect(transactionCall).toBeDefined();
     const requestBody = JSON.parse(transactionCall!.init!.body as string) as Record<string, unknown>;
-    expect(requestBody.payloadData).toBeDefined();
+    expect(requestBody.payloadData).toBeUndefined();
     expect(requestBody.payloadHash).toMatch(/^[A-Za-z0-9_-]+$/);
+  });
+
+  test('generates Operon signature headers using managed keys', async () => {
+    const tokenPayload = {
+      participant_did: 'did:example:signer',
+      channel_id: 'chnl-sign'
+    };
+
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url === TOKEN_URL) {
+        return buildResponse({
+          access_token: `header.${Buffer.from(JSON.stringify(tokenPayload)).toString('base64url')}.sig`,
+          token_type: 'Bearer',
+          expires_in: 300
+        });
+      }
+
+      if (url === `${BASE_URL}/v1/dids/self/sign`) {
+        const body = init?.body ? JSON.parse(init.body as string) : {};
+        expect(body.payloadHash).toBeDefined();
+        return buildResponse({
+          signature: {
+            algorithm: 'EdDSA',
+            value: 'signed-value',
+            keyId: 'did:example:signer#keys-1'
+          }
+        });
+      }
+
+      throw new Error(`unexpected fetch call to ${url}`);
+    });
+
+    const client = new OperonClient(
+      createConfig({
+        baseUrl: BASE_URL,
+        tokenUrl: TOKEN_URL,
+        clientId: 'client',
+        clientSecret: 'secret',
+        fetchImpl
+      })
+    );
+
+    const headers = await client.generateSignatureHeaders({ foo: 'bar' });
+    expect(headers['X-Operon-DID']).toBe('did:example:signer');
+    expect(headers['X-Operon-Payload-Hash']).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(headers['X-Operon-Signature']).toBe('signed-value');
+    expect(headers['X-Operon-Signature-KeyId']).toBe('did:example:signer#keys-1');
+    expect(headers['X-Operon-Signature-Alg']).toBe('EdDSA');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   test('uses provided signature when self signing disabled', async () => {
@@ -120,24 +177,32 @@ describe('OperonClient', () => {
           expires_in: 300
         });
       }
-      if (url === `${BASE_URL}/v1/interactions`) {
+      if (url === `${BASE_URL}/v1/channels/chnl-override/interactions`) {
         return buildResponse({
-          data: [
+          interactions: [
             {
               id: 'int-manual',
               channelId: 'chnl-override',
               sourceParticipantId: 'part-1',
               targetParticipantId: 'part-2'
             }
-          ]
+          ],
+          totalCount: 1,
+          page: 1,
+          pageSize: 50,
+          hasMore: false
         });
       }
-      if (url === `${BASE_URL}/v1/participants`) {
+      if (url === `${BASE_URL}/v1/channels/chnl-override/participants`) {
         return buildResponse({
-          data: [
+          participants: [
             { id: 'part-1', did: 'did:example:src' },
             { id: 'part-2', did: 'did:example:dst' }
-          ]
+          ],
+          totalCount: 2,
+          page: 1,
+          pageSize: 50,
+          hasMore: false
         });
       }
       if (url === `${BASE_URL}/v1/transactions`) {

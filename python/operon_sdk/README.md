@@ -37,6 +37,9 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
+> **Security note**
+> The Python SDK mirrors the Go implementation: it computes a SHA-256 hash of any payload bytes you provide and only transmits the hash (`payloadHash`) to Operon. Raw payloads never leave your application boundary.
+
 ## Development
 
 ```bash

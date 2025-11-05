@@ -6,7 +6,7 @@
 
     <groupId>cloud.operon</groupId>
     <artifactId>operon-sdk</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <name>Operon SDK (Java)</name>
     <description>Java client SDK for Operon Platform</description>
     <url>https://operon.cloud</url>

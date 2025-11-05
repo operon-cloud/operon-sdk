@@ -16,8 +16,10 @@ import cloud.operon.sdk.signing.Signer;
 import cloud.operon.sdk.signing.SigningResult;
 
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -67,6 +69,7 @@ public final class OperonClient implements AutoCloseable {
 
     private final Object referenceLock = new Object();
     private boolean referenceLoaded;
+    private String referenceChannelId;
 
     private final Object participantLock = new Object();
     private String cachedParticipantDid;
@@ -221,7 +224,6 @@ public final class OperonClient implements AutoCloseable {
 
         TransactionRequest.PayloadResolution payloadResolution = request.resolvePayload();
         String payloadHash = payloadResolution.payloadHash();
-        String payloadData = payloadResolution.payloadData();
 
         Signature signature = request.getSignature();
         if (signature == null) {
@@ -275,7 +277,6 @@ public final class OperonClient implements AutoCloseable {
             validated.getSourceDid(),
             validated.getTargetDid(),
             new SignaturePayload(signature.algorithm(), signature.value(), signature.keyId()),
-            payloadData,
             payloadHash,
             sanitizedLabel,
             sanitizedTags.isEmpty() ? null : sanitizedTags
@@ -319,31 +320,43 @@ public final class OperonClient implements AutoCloseable {
     }
 
     private void ensureReferenceData() throws OperonException {
-        if (referenceLoaded) {
+        Token token = getToken();
+        String channelId = optionalTrim(token.getChannelId());
+        if (channelId == null) {
+            throw new OperonException("channel ID unavailable on access token; cannot load reference data");
+        }
+
+        if (referenceLoaded && Objects.equals(referenceChannelId, channelId)) {
             return;
         }
+
         synchronized (referenceLock) {
-            if (referenceLoaded) {
+            if (referenceLoaded && Objects.equals(referenceChannelId, channelId)) {
                 return;
             }
-            Token token = getToken();
-            loadReferenceData(token.getAccessToken());
+            loadReferenceData(token.getAccessToken(), channelId);
             referenceLoaded = true;
+            referenceChannelId = channelId;
         }
     }
 
     private void reloadReferenceData() throws OperonException {
         synchronized (referenceLock) {
             Token token = getToken();
-            loadReferenceData(token.getAccessToken());
+            String channelId = optionalTrim(token.getChannelId());
+            if (channelId == null) {
+                throw new OperonException("channel ID unavailable on access token; cannot reload reference data");
+            }
+            loadReferenceData(token.getAccessToken(), channelId);
             referenceLoaded = true;
+            referenceChannelId = channelId;
         }
     }
 
-    private void loadReferenceData(String bearer) throws OperonException {
+    private void loadReferenceData(String bearer, String channelId) throws OperonException {
         LOGGER.info(() -> "[operon-sdk] refreshing reference data cache");
-        List<Interaction> interactions = fetchInteractions(bearer);
-        List<Participant> participants = fetchParticipants(bearer);
+        List<Interaction> interactions = fetchInteractions(bearer, channelId);
+        List<Participant> participants = fetchParticipants(bearer, channelId);
 
         Map<String, String> participantDidLookup = new HashMap<>();
         for (Participant participant : participants) {
@@ -371,11 +384,13 @@ public final class OperonClient implements AutoCloseable {
             enriched.size(), participants.size()));
     }
 
-    private List<Interaction> fetchInteractions(String bearer) throws OperonException {
-        LOGGER.info(() -> "[operon-sdk] requesting /v1/interactions");
+    private List<Interaction> fetchInteractions(String bearer, String channelId) throws OperonException {
+        String encodedChannel = URLEncoder.encode(channelId, StandardCharsets.UTF_8);
+        String path = String.format(Locale.ROOT, "/v1/channels/%s/interactions", encodedChannel);
+        LOGGER.info(() -> "[operon-sdk] requesting " + path);
         HttpResponse<java.io.InputStream> response;
         try {
-            response = HttpUtil.sendJson(httpClient, "GET", baseUrl + "/v1/interactions", null, bearer);
+            response = HttpUtil.sendJson(httpClient, "GET", baseUrl + path, null, bearer);
         } catch (IOException | InterruptedException ex) {
             if (ex instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
@@ -390,7 +405,7 @@ public final class OperonClient implements AutoCloseable {
             }
 
             JsonNode root = Json.mapper().readTree(bodyStream);
-            JsonNode data = root.path("data");
+            JsonNode data = root.path("interactions");
             List<Interaction> results = new ArrayList<>();
             if (data.isArray()) {
                 for (JsonNode node : data) {
@@ -405,18 +420,20 @@ public final class OperonClient implements AutoCloseable {
                 }
             }
             LOGGER.info(() -> String.format(Locale.ROOT,
-                "[operon-sdk] /v1/interactions returned %d records", results.size()));
+                "[operon-sdk] %s returned %d records", path, results.size()));
             return results;
         } catch (IOException ex) {
             throw new OperonException("decode interactions response: " + ex.getMessage(), ex);
         }
     }
 
-    private List<Participant> fetchParticipants(String bearer) throws OperonException {
-        LOGGER.info(() -> "[operon-sdk] requesting /v1/participants");
+    private List<Participant> fetchParticipants(String bearer, String channelId) throws OperonException {
+        String encodedChannel = URLEncoder.encode(channelId, StandardCharsets.UTF_8);
+        String path = String.format(Locale.ROOT, "/v1/channels/%s/participants", encodedChannel);
+        LOGGER.info(() -> "[operon-sdk] requesting " + path);
         HttpResponse<java.io.InputStream> response;
         try {
-            response = HttpUtil.sendJson(httpClient, "GET", baseUrl + "/v1/participants", null, bearer);
+            response = HttpUtil.sendJson(httpClient, "GET", baseUrl + path, null, bearer);
         } catch (IOException | InterruptedException ex) {
             if (ex instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
@@ -431,7 +448,7 @@ public final class OperonClient implements AutoCloseable {
             }
 
             JsonNode root = Json.mapper().readTree(bodyStream);
-            JsonNode data = root.path("data");
+            JsonNode data = root.path("participants");
             List<Participant> results = new ArrayList<>();
             if (data.isArray()) {
                 for (JsonNode node : data) {
@@ -444,7 +461,7 @@ public final class OperonClient implements AutoCloseable {
                 }
             }
             LOGGER.info(() -> String.format(Locale.ROOT,
-                "[operon-sdk] /v1/participants returned %d records", results.size()));
+                "[operon-sdk] %s returned %d records", path, results.size()));
             return results;
         } catch (IOException ex) {
             throw new OperonException("decode participants response: " + ex.getMessage(), ex);
@@ -590,7 +607,6 @@ public final class OperonClient implements AutoCloseable {
         String sourceDid,
         String targetDid,
         SignaturePayload signature,
-        String payloadData,
         String payloadHash,
         String label,
         List<String> tags

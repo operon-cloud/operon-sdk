@@ -10,7 +10,7 @@ Use the Maven coordinates once the artifact is published (example coordinates sh
 <dependency>
   <groupId>cloud.operon</groupId>
   <artifactId>operon-sdk</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <scope>compile</scope>
 </dependency>
 ```
@@ -19,7 +19,7 @@ Gradle (Kotlin DSL):
 
 ```kotlin
 dependencies {
-  implementation("cloud.operon:operon-sdk:1.0.0")
+implementation("cloud.operon:operon-sdk:1.0.1")
 }
 ```
 
@@ -55,6 +55,9 @@ public class Example {
   }
 }
 ```
+
+> **Security note**
+> The Java SDK mirrors the Go implementation: every payload is hashed locally and only the hash (`payloadHash`) is transmitted to Operon. Raw payload bytes remain in your application.
 
 ## Features
 

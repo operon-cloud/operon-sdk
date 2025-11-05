@@ -6,19 +6,18 @@ use chrono::{DateTime, Utc};
 use reqwest::{Client, StatusCode, Url};
 use serde_json;
 use tokio::sync::RwLock;
+use urlencoding::encode;
 
 use crate::auth::{AccessToken, ClientCredentialsTokenProvider};
 use crate::config::{ConfigError, OperonConfig};
 use crate::errors::OperonError;
 use crate::models::{
-    DataEnvelope, InteractionSummary, ParticipantSummary, Signature, Transaction,
-    TransactionRequest,
+    ChannelInteractionsEnvelope, ChannelParticipantsEnvelope, InteractionSummary,
+    ParticipantSummary, Signature, Transaction, TransactionRequest,
 };
 
 const SELF_SIGN_PATH: &str = "v1/dids/self/sign";
 const TRANSACTION_PATH: &str = "v1/transactions";
-const INTERACTIONS_PATH: &str = "v1/interactions";
-const PARTICIPANTS_PATH: &str = "v1/participants";
 
 #[derive(Clone)]
 pub struct OperonClient {
@@ -80,7 +79,6 @@ impl OperonClient {
             "sourceDid": request.source_did.as_ref().unwrap(),
             "targetDid": request.target_did.as_ref().unwrap(),
             "signature": request.signature,
-            "payloadData": payload.payload_data,
             "payloadHash": payload.payload_hash,
             "label": request.label,
             "tags": request.tags,
@@ -144,9 +142,18 @@ impl OperonClient {
     }
 
     async fn refresh_catalog(&self, token: &AccessToken) -> Result<(), OperonError> {
+        let channel_id = token
+            .channel_id
+            .clone()
+            .ok_or_else(|| OperonError::validation("channel_id missing from token"))?;
+
+        let encoded_channel = encode(&channel_id);
+        let interactions_path = format!("v1/channels/{}/interactions", encoded_channel);
+        let participants_path = format!("v1/channels/{}/participants", encoded_channel);
+
         let interactions_resp = self
             .http
-            .get(self.join(INTERACTIONS_PATH)?)
+            .get(self.join(&interactions_path)?)
             .bearer_auth(&token.value)
             .send()
             .await
@@ -157,14 +164,14 @@ impl OperonClient {
                 interactions_resp.text().await.ok(),
             ));
         }
-        let mut interactions: DataEnvelope<InteractionSummary> = interactions_resp
+        let mut interactions: ChannelInteractionsEnvelope = interactions_resp
             .json()
             .await
             .map_err(OperonError::Transport)?;
 
         let participants_resp = self
             .http
-            .get(self.join(PARTICIPANTS_PATH)?)
+            .get(self.join(&participants_path)?)
             .bearer_auth(&token.value)
             .send()
             .await
@@ -175,18 +182,18 @@ impl OperonClient {
                 participants_resp.text().await.ok(),
             ));
         }
-        let participants: DataEnvelope<ParticipantSummary> = participants_resp
+        let participants: ChannelParticipantsEnvelope = participants_resp
             .json()
             .await
             .map_err(OperonError::Transport)?;
 
         let map: std::collections::HashMap<_, _> = participants
-            .data
+            .participants
             .iter()
             .map(|p| (p.id.clone(), p.did.clone()))
             .collect();
 
-        for interaction in interactions.data.iter_mut() {
+        for interaction in interactions.interactions.iter_mut() {
             if let Some(did) = map.get(&interaction.source_participant_id) {
                 interaction.source_did = Some(did.clone());
             }
@@ -195,8 +202,8 @@ impl OperonClient {
             }
         }
 
-        *self.participants.write().await = Some(participants.data);
-        *self.interactions.write().await = Some(interactions.data);
+        *self.participants.write().await = Some(participants.participants);
+        *self.interactions.write().await = Some(interactions.interactions);
         Ok(())
     }
 
@@ -276,7 +283,6 @@ impl OperonClient {
 }
 
 struct ResolvedPayload {
-    payload_data: Option<String>,
     payload_hash: String,
 }
 
@@ -290,10 +296,7 @@ fn resolve_payload(request: &TransactionRequest) -> Result<ResolvedPayload, Oper
                 ));
             }
         }
-        return Ok(ResolvedPayload {
-            payload_data: Some(base64::engine::general_purpose::STANDARD.encode(bytes)),
-            payload_hash: hash,
-        });
+        return Ok(ResolvedPayload { payload_hash: hash });
     }
 
     if let Some(hash) = &request.payload_hash {
@@ -301,7 +304,6 @@ fn resolve_payload(request: &TransactionRequest) -> Result<ResolvedPayload, Oper
             return Err(OperonError::validation("payload hash cannot be empty"));
         }
         return Ok(ResolvedPayload {
-            payload_data: None,
             payload_hash: hash.clone(),
         });
     }

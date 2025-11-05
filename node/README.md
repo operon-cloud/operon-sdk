@@ -36,6 +36,25 @@ console.log(txn.id, txn.status);
 await client.close();
 ```
 
+> **Security note**
+> The Node.js SDK mirrors the Go client: it computes a SHA-256 hash of any payload you provide and only transmits the hash (`payloadHash`) to Operon. Raw payload bytes stay inside your service boundary.
+
+### Generate Operon Headers
+
+Need to call a downstream API with Operon-managed signatures? Use `generateSignatureHeaders` to obtain the DID headers without manually constructing payload hashes:
+
+```ts
+const headers = await client.generateSignatureHeaders(JSON.stringify(body));
+fetch(targetUrl, {
+  method: 'POST',
+  body: JSON.stringify(body),
+  headers: {
+    ...headers,
+    'Content-Type': 'application/json'
+  }
+});
+```
+
 ## Scripts
 
 ```bash

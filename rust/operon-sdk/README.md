@@ -6,7 +6,7 @@ Idiomatic Rust client for the [Operon.Cloud](https://www.operon.cloud) platform 
 
 ```toml
 [dependencies]
-operon-sdk = { path = "../operon-sdk" }
+operon-sdk = "1.0.1"
 ```
 
 ```rust
@@ -28,10 +28,13 @@ async fn main() -> anyhow::Result<()> {
             .with_payload_bytes(br"{\"foo\":\"bar\"}"))
         .await?;
 
-    println!("transaction {} status={}", txn.id, txn.status);
+println!("transaction {} status={}", txn.id, txn.status);
     Ok(())
 }
 ```
+
+> **Security note**
+> The Rust SDK mirrors the Go implementation: it computes a SHA-256 hash locally and only sends the hash (`payloadHash`) to Operon. Raw payload bytes never leave your service.
 
 ## Development
 

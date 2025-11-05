@@ -2,8 +2,6 @@ package cloud.operon.sdk;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.Base64;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class TransactionRequestTest {
@@ -22,8 +20,8 @@ class TransactionRequestTest {
             .build();
 
         TransactionRequest.PayloadResolution resolution = request.resolvePayload();
-        assertNotNull(resolution.payloadData());
-        assertEquals(Base64.getEncoder().encodeToString(payload), resolution.payloadData());
+        assertNotNull(resolution.payloadBytes());
+        assertArrayEquals(payload, resolution.payloadBytes());
         assertEquals(43, resolution.payloadHash().length());
     }
 

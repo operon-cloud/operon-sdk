@@ -116,14 +116,14 @@ class TransactionRequest(BaseModel):
         self.signature = signature
         return self
 
-    def compute_payload(self) -> tuple[Optional[str], str]:
-        """Return a base64 payload body (if provided) and deterministic hash."""
+    def compute_payload(self) -> tuple[Optional[bytes], str]:
+        """Return optional raw payload bytes and the deterministic hash."""
         if self.payload_bytes:
             digest = sha256(self.payload_bytes).digest()
             encoded_hash = urlsafe_b64encode(digest).decode().rstrip("=")
             if self.payload_hash and self.payload_hash != encoded_hash:
                 raise ValueError("provided payload hash does not match payload bytes")
-            return urlsafe_b64encode(self.payload_bytes).decode(), encoded_hash
+            return self.payload_bytes, encoded_hash
         if self.payload_hash:
             return None, self.payload_hash
         raise ValueError("payload bytes or payload hash must be provided")

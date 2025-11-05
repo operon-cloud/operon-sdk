@@ -22,8 +22,8 @@ from .models import (
 
 SELF_SIGN_ENDPOINT = "v1/dids/self/sign"
 TRANSACTIONS_ENDPOINT = "v1/transactions"
-INTERACTIONS_ENDPOINT = "v1/interactions"
-PARTICIPANTS_ENDPOINT = "v1/participants"
+CHANNEL_INTERACTIONS_ENDPOINT = "v1/channels/{channel_id}/interactions"
+CHANNEL_PARTICIPANTS_ENDPOINT = "v1/channels/{channel_id}/participants"
 
 
 class OperonClient:
@@ -44,6 +44,7 @@ class OperonClient:
         )
         self._interactions: Optional[List[InteractionSummary]] = None
         self._participants: Optional[List[ParticipantSummary]] = None
+        self._catalog_channel_id: Optional[str] = None
         self._catalog_lock = asyncio.Lock()
 
     async def init(self) -> None:
@@ -72,7 +73,7 @@ class OperonClient:
         if request.interaction_id:
             await self._ensure_catalog(request, token)
 
-        payload_data, payload_hash = request.compute_payload()
+        _, payload_hash = request.compute_payload()
         signature = await self._resolve_signature(request, payload_hash, token)
         request.signature = signature
 
@@ -88,8 +89,6 @@ class OperonClient:
             "signature": request.signature.model_dump(by_alias=True),
             "payloadHash": payload_hash,
         }
-        if payload_data:
-            body["payloadData"] = payload_data
         if request.label:
             body["label"] = request.label
         if request.tags:
@@ -110,9 +109,18 @@ class OperonClient:
         return Transaction.model_validate(response.json())
 
     async def _ensure_catalog(self, request: TransactionRequest, token: AccessToken) -> None:
+        channel_id = request.channel_id or token.channel_id
+        if not channel_id:
+            raise ValidationError("channel_id required to load interaction catalogue")
+
         async with self._catalog_lock:
-            if self._interactions is None or self._participants is None:
-                await self._refresh_catalog(token)
+            requires_refresh = (
+                self._interactions is None
+                or self._participants is None
+                or self._catalog_channel_id != channel_id
+            )
+            if requires_refresh:
+                await self._refresh_catalog(token, channel_id)
             if self._interactions:
                 match = next(
                     (item for item in self._interactions if item.id == request.interaction_id), None
@@ -124,14 +132,13 @@ class OperonClient:
                     )
                     request.target_did = request.target_did or match.target_did
 
-    async def _refresh_catalog(self, token: AccessToken) -> None:
+    async def _refresh_catalog(self, token: AccessToken, channel_id: str) -> None:
         headers = {"Authorization": f"Bearer {token.value}"}
-        interactions_task = self._client.get(
-            self._config.api_url(INTERACTIONS_ENDPOINT), headers=headers
-        )
-        participants_task = self._client.get(
-            self._config.api_url(PARTICIPANTS_ENDPOINT), headers=headers
-        )
+        interactions_path = CHANNEL_INTERACTIONS_ENDPOINT.format(channel_id=channel_id)
+        participants_path = CHANNEL_PARTICIPANTS_ENDPOINT.format(channel_id=channel_id)
+
+        interactions_task = self._client.get(self._config.api_url(interactions_path), headers=headers)
+        participants_task = self._client.get(self._config.api_url(participants_path), headers=headers)
         interactions_response, participants_response = await asyncio.gather(
             interactions_task, participants_task
         )
@@ -147,12 +154,14 @@ class OperonClient:
 
         envelope = interactions_response.json()
         participants_envelope = participants_response.json()
+        interactions_payload = envelope.get("interactions", [])
+        participants_payload = participants_envelope.get("participants", [])
+
         self._interactions = [
-            InteractionSummary.model_validate(item) for item in envelope.get("data", [])
+            InteractionSummary.model_validate(item) for item in interactions_payload
         ]
         participants = [
-            ParticipantSummary.model_validate(item)
-            for item in participants_envelope.get("data", [])
+            ParticipantSummary.model_validate(item) for item in participants_payload
         ]
         mapping = {p.id: p.did for p in participants}
         for interaction in self._interactions:
@@ -161,6 +170,7 @@ class OperonClient:
             if interaction.target_participant_id in mapping:
                 interaction.target_did = mapping[interaction.target_participant_id]
         self._participants = participants
+        self._catalog_channel_id = channel_id
 
     async def _resolve_signature(
         self, request: TransactionRequest, payload_hash: str, token: AccessToken

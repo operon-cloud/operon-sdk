@@ -42,7 +42,7 @@ Add the package to your application (once published to NuGet):
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="Operon.Sdk" Version="1.0.0" />
+  <PackageReference Include="Operon.Sdk" Version="1.0.1" />
 </ItemGroup>
 ```
 
@@ -68,6 +68,9 @@ var response = await client.SubmitTransactionAsync(new TransactionRequest
 
 Console.WriteLine($"Transaction {response.Id} status={response.Status}");
 ```
+
+> **Security note**
+> The .NET SDK mirrors the Go implementation: it hashes payload bytes locally and only transmits the hash (`payloadHash`) to Operon. Raw payloads stay within your application boundary.
 
 ## Versioning & Packaging
 

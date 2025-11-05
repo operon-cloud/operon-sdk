@@ -46,8 +46,8 @@ class OperonClientTest {
         signerHandler.delegate = new SigningHandler();
 
         server.createContext("/oauth2/token", tokenHandler);
-        server.createContext("/client-api/v1/interactions", interactionsHandler);
-        server.createContext("/client-api/v1/participants", participantsHandler);
+        server.createContext("/client-api/v1/channels/chan-1/interactions", interactionsHandler);
+        server.createContext("/client-api/v1/channels/chan-1/participants", participantsHandler);
         server.createContext("/client-api/v1/transactions", transactionsHandler);
         server.createContext("/client-api/v1/dids/self/sign", signerHandler);
         server.start();
@@ -255,7 +255,7 @@ class OperonClientTest {
     private class InteractionsHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            String body = "{\"data\":[{\"id\":\"intr-1\",\"channelId\":\"chan-1\",\"sourceParticipantId\":\"part-1\",\"targetParticipantId\":\"part-2\"}]}";
+            String body = "{\"interactions\":[{\"id\":\"intr-1\",\"channelId\":\"chan-1\",\"sourceParticipantId\":\"part-1\",\"targetParticipantId\":\"part-2\"}],\"totalCount\":1,\"page\":1,\"pageSize\":50,\"hasMore\":false}";
             respond(exchange, 200, body);
         }
     }
@@ -263,7 +263,7 @@ class OperonClientTest {
     private class ParticipantsHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            String body = "{\"data\":[{\"id\":\"part-1\",\"did\":\"did:test:source\"},{\"id\":\"part-2\",\"did\":\"did:test:target\"}]}";
+            String body = "{\"participants\":[{\"id\":\"part-1\",\"did\":\"did:test:source\"},{\"id\":\"part-2\",\"did\":\"did:test:target\"}],\"totalCount\":2,\"page\":1,\"pageSize\":50,\"hasMore\":false}";
             respond(exchange, 200, body);
         }
     }

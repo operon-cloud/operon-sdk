@@ -138,12 +138,11 @@ public final class TransactionRequest {
      */
     public PayloadResolution resolvePayload() throws OperonException {
         if (payload != null && payload.length > 0) {
-            String payloadData = Base64.getEncoder().encodeToString(payload);
             String computedHash = computePayloadHash(payload);
             if (payloadHash != null && !payloadHash.isBlank() && !payloadHash.equals(computedHash)) {
                 throw new OperonException("provided payload hash does not match payload content");
             }
-            return new PayloadResolution(payloadData, computedHash);
+            return new PayloadResolution(payload.clone(), computedHash);
         }
 
         String trimmedHash = Optional.ofNullable(payloadHash).map(String::trim).orElse("");
@@ -176,13 +175,15 @@ public final class TransactionRequest {
     }
 
     /**
-     * Captures the encoded payload and its base64url SHA-256 hash. {@code payloadData} will be {@code null} when the
-     * caller supplied only a hash.
+     * Captures raw payload bytes (when supplied) alongside the base64url SHA-256 hash required by Operon APIs.
      *
-     * @param payloadData base64 encoded payload bytes (nullable).
+     * @param payloadBytes raw payload bytes (nullable when only a hash is provided).
      * @param payloadHash base64url encoded SHA-256 hash (never {@code null}).
      */
-    public record PayloadResolution(String payloadData, String payloadHash) {
+    public record PayloadResolution(byte[] payloadBytes, String payloadHash) {
+        public PayloadResolution {
+            payloadBytes = payloadBytes == null ? null : payloadBytes.clone();
+        }
     }
 
     /**

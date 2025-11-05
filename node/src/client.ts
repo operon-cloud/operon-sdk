@@ -8,9 +8,13 @@ import { jsonRequest } from './http/json.js';
 import { SelfSigner } from './signing/self-signer.js';
 import { DisabledSigner, type Signer } from './signing/types.js';
 import type {
+  OperonHeaders,
+  ChannelInteractionsResponse,
+  ChannelParticipantsResponse,
   InteractionSummary,
   ParticipantSummary,
   Signature,
+  SignatureValidationResult,
   Transaction,
   TransactionRequest,
   TransactionPayload
@@ -24,7 +28,6 @@ interface TransactionSubmission {
   sourceDid: string;
   targetDid: string;
   signature: Signature;
-  payloadData?: string;
   payloadHash: string;
   label?: string;
   tags?: string[];
@@ -141,7 +144,7 @@ export class OperonClient {
 
     await this.populateInteractionFields(req, options.signal);
 
-    const { payloadData, payloadHash } = await resolvePayload(req.payload, req.payloadHash);
+    const { payloadHash } = await resolvePayload(req.payload, req.payloadHash);
     req.payloadHash = payloadHash;
 
     const signature = await this.resolveSignature(token.accessToken, req, options.signal);
@@ -160,7 +163,6 @@ export class OperonClient {
       targetDid: req.targetDid!.trim(),
       signature,
       payloadHash,
-      payloadData,
       label: req.label?.trim() || undefined,
       tags: sanitizedTags.length > 0 ? sanitizedTags : undefined
     };
@@ -179,6 +181,58 @@ export class OperonClient {
 
     const body = (await response.json()) as TransactionResponse;
     return deserializeTransaction(body);
+  }
+
+  /**
+   * Generates Operon signature headers for the provided payload using managed signing keys.
+   *
+   * @param payload Raw payload to sign (string, bytes, or JSON-serialisable object).
+   * @param algorithm Optional signing algorithm override; defaults to the client configuration.
+   * @param options Optional request controls (e.g., abort signal).
+   */
+  async generateSignatureHeaders(
+    payload: TransactionPayload,
+    algorithm?: string,
+    options: { signal?: AbortSignal } = {}
+  ): Promise<OperonHeaders> {
+    if (!this.selfSigning) {
+      throw new ValidationError('automatic signing disabled; enable self signing to generate headers');
+    }
+
+    const payloadInput = await resolvePayload(payload, undefined);
+    if (!payloadInput.payloadBytes) {
+      throw new ValidationError('payload bytes are required to generate Operon headers');
+    }
+
+    const token = await this.tokenValue(options.signal);
+    const sourceDid = this.participantDid?.trim();
+    if (!sourceDid) {
+      throw new ValidationError('participant DID unavailable on access token');
+    }
+
+    const selectedAlgorithm = algorithm?.trim() || this.config.signingAlgorithm;
+    const signingResult = await this.signer.sign(
+      token.accessToken,
+      payloadInput.payloadHash,
+      selectedAlgorithm,
+      options.signal
+    );
+
+    const signatureValue = signingResult.value?.trim();
+    if (!signatureValue) {
+      throw new ValidationError('signature response missing value');
+    }
+
+    const keyId = signingResult.keyId?.trim() || `${sourceDid}#keys-1`;
+    const algorithmValue = signingResult.algorithm?.trim() || selectedAlgorithm;
+
+    return {
+      [HEADER_OPERON_DID]: sourceDid,
+      [HEADER_OPERON_PAYLOAD_HASH]: payloadInput.payloadHash,
+      [HEADER_OPERON_SIGNATURE]: signatureValue,
+      [HEADER_OPERON_SIGNATURE_KEY]: keyId,
+      [HEADER_OPERON_SIGNATURE_ALG]: algorithmValue
+    };
   }
 
   /**
@@ -216,6 +270,11 @@ export class OperonClient {
     request: TransactionRequest,
     signal?: AbortSignal
   ): Promise<void> {
+    const explicitChannel = request.channelId?.trim();
+    if (explicitChannel) {
+      this.channelId = explicitChannel;
+    }
+
     if (!request.channelId?.trim() && this.channelId) {
       request.channelId = this.channelId;
     }
@@ -306,65 +365,88 @@ export class OperonClient {
 
   private async reloadReferenceData(signal?: AbortSignal): Promise<void> {
     const token = await this.tokenValue(signal);
+    const channel = this.channelId?.trim();
+    if (!channel) {
+      throw new ValidationError('channelId unavailable on access token; provide channelId explicitly');
+    }
 
     const [interactionsResp, participantsResp] = await Promise.all([
-      this.fetchInteractions(token.accessToken, signal),
-      this.fetchParticipants(token.accessToken, signal)
+      this.fetchInteractions(token.accessToken, channel, signal),
+      this.fetchParticipants(token.accessToken, channel, signal)
     ]);
 
     const participantsMap = new Map<string, string>();
-    for (const participant of participantsResp) {
+    for (const participant of participantsResp.participants) {
       if (participant.id && participant.did) {
         participantsMap.set(participant.id, participant.did);
       }
     }
 
-    const interactions = interactionsResp.map((item) => ({
+    const interactions = interactionsResp.interactions.map((item) => ({
       id: item.id,
-      channelId: item.channelId,
+      channelId: item.channelId ?? channel,
       sourceParticipantId: item.sourceParticipantId,
       targetParticipantId: item.targetParticipantId,
       sourceDid: participantsMap.get(item.sourceParticipantId),
       targetDid: participantsMap.get(item.targetParticipantId)
     }));
 
-    this.registry.replaceParticipants(participantsResp);
+    const participantMetadata = participantsResp.participants.map((participant) => ({
+      id: participant.id,
+      did: participant.did
+    }));
+
+    this.registry.replaceParticipants(participantMetadata);
     this.registry.replaceInteractions(interactions);
     this.referenceLoaded = true;
   }
 
   private async fetchInteractions(
     token: string,
+    channelId: string,
     signal?: AbortSignal
-  ): Promise<InteractionsResponse['data']> {
+  ): Promise<ChannelInteractionsResponse> {
     const response = await jsonRequest(this.config, {
       method: 'GET',
-      path: '/v1/interactions',
+      path: `/v1/channels/${encodeURIComponent(channelId)}/interactions`,
       token,
       signal
     });
     if (response.status >= 400) {
       throw await decodeApiError(response);
     }
-    const payload = (await response.json()) as InteractionsResponse;
-    return payload.data ?? [];
+    const payload = (await response.json()) as ChannelInteractionsResponse;
+    return {
+      interactions: payload.interactions ?? [],
+      totalCount: payload.totalCount ?? 0,
+      page: payload.page ?? 0,
+      pageSize: payload.pageSize ?? 0,
+      hasMore: payload.hasMore ?? false
+    };
   }
 
   private async fetchParticipants(
     token: string,
+    channelId: string,
     signal?: AbortSignal
-  ): Promise<ParticipantsResponse['data']> {
+  ): Promise<ChannelParticipantsResponse> {
     const response = await jsonRequest(this.config, {
       method: 'GET',
-      path: '/v1/participants',
+      path: `/v1/channels/${encodeURIComponent(channelId)}/participants`,
       token,
       signal
     });
     if (response.status >= 400) {
       throw await decodeApiError(response);
     }
-    const payload = (await response.json()) as ParticipantsResponse;
-    return payload.data ?? [];
+    const payload = (await response.json()) as ChannelParticipantsResponse;
+    return {
+      participants: payload.participants ?? [],
+      totalCount: payload.totalCount ?? 0,
+      page: payload.page ?? 0,
+      pageSize: payload.pageSize ?? 0,
+      hasMore: payload.hasMore ?? false
+    };
   }
 }
 
@@ -372,12 +454,15 @@ function isOperonConfig(value: OperonConfig | OperonConfigInput): value is Opero
   return (value as OperonConfig).fetchImpl !== undefined;
 }
 
-async function resolvePayload(payload: TransactionPayload | undefined, hash?: string) {
+async function resolvePayload(
+  payload: TransactionPayload | undefined,
+  hash?: string
+): Promise<{ payloadHash: string; payloadBytes?: Buffer }> {
   if (payload === undefined || payload === null) {
     if (!hash?.trim()) {
       throw new ValidationError('payload or payloadHash is required');
     }
-    return { payloadData: undefined, payloadHash: hash.trim() };
+    return { payloadHash: hash.trim(), payloadBytes: undefined };
   }
 
   let bytes: Uint8Array;
@@ -389,7 +474,6 @@ async function resolvePayload(payload: TransactionPayload | undefined, hash?: st
     bytes = Buffer.from(JSON.stringify(payload));
   }
 
-  const payloadData = Buffer.from(bytes).toString('base64');
   const digest = createHash('sha256').update(bytes).digest();
   const payloadHash = base64UrlEncode(digest);
 
@@ -397,7 +481,7 @@ async function resolvePayload(payload: TransactionPayload | undefined, hash?: st
     throw new ValidationError('provided payloadHash does not match payload content');
   }
 
-  return { payloadData, payloadHash };
+  return { payloadHash, payloadBytes: Buffer.from(bytes) };
 }
 
 function validateRequest(request: TransactionRequest): void {
@@ -443,3 +527,8 @@ function base64UrlEncode(buffer: Buffer): string {
     .replace(/\+/g, '-')
     .replace(/\//g, '_');
 }
+const HEADER_OPERON_DID = 'X-Operon-DID';
+const HEADER_OPERON_PAYLOAD_HASH = 'X-Operon-Payload-Hash';
+const HEADER_OPERON_SIGNATURE = 'X-Operon-Signature';
+const HEADER_OPERON_SIGNATURE_KEY = 'X-Operon-Signature-KeyId';
+const HEADER_OPERON_SIGNATURE_ALG = 'X-Operon-Signature-Alg';

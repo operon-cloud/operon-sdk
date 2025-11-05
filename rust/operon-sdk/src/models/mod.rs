@@ -156,6 +156,13 @@ impl TransactionRequest {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct DataEnvelope<T> {
-    pub data: Vec<T>,
+pub(crate) struct ChannelInteractionsEnvelope {
+    #[serde(default)]
+    pub interactions: Vec<InteractionSummary>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChannelParticipantsEnvelope {
+    #[serde(default)]
+    pub participants: Vec<ParticipantSummary>,
 }

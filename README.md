@@ -10,12 +10,12 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 - **Secure by default**: Consistent client initialization (timeouts, TLS, mTLS-ready) and guardrails for credential handling.
 
 > **SDK Coverage**  
-> ✅ Go (1.1.2)  
-> ✅ Java (1.0.0)  
-> ✅ Node.js (1.0.0)  
-> ✅ .NET (1.0.0)  
-> ✅ Rust (1.0.0)  
-> ✅ Python (1.0.0)
+> ✅ Go (1.1.3)  
+> ✅ Java (1.0.1)  
+> ✅ Node.js (1.0.1)  
+> ✅ .NET (1.0.1)  
+> ✅ Rust (1.0.1)  
+> ✅ Python (1.0.1)
 
 ---
 

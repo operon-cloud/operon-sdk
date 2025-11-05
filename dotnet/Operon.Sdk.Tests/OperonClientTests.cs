@@ -29,10 +29,10 @@ public sealed class OperonClientTests
 
         handler.Enqueue(request =>
         {
-            Assert.EndsWith("/v1/interactions", request.RequestUri!.AbsolutePath, StringComparison.Ordinal);
+            Assert.EndsWith("/v1/channels/chnl-1/interactions", request.RequestUri!.AbsolutePath, StringComparison.Ordinal);
             return StubHttpMessageHandler.Json(HttpStatusCode.OK, new
             {
-                data = new[]
+                interactions = new[]
                 {
                     new
                     {
@@ -41,20 +41,28 @@ public sealed class OperonClientTests
                         sourceParticipantId = "part-1",
                         targetParticipantId = "part-2"
                     }
-                }
+                },
+                totalCount = 1,
+                page = 1,
+                pageSize = 50,
+                hasMore = false
             });
         });
 
         handler.Enqueue(request =>
         {
-            Assert.EndsWith("/v1/participants", request.RequestUri!.AbsolutePath, StringComparison.Ordinal);
+            Assert.EndsWith("/v1/channels/chnl-1/participants", request.RequestUri!.AbsolutePath, StringComparison.Ordinal);
             return StubHttpMessageHandler.Json(HttpStatusCode.OK, new
             {
-                data = new[]
+                participants = new[]
                 {
                     new { id = "part-1", did = "did:test:123" },
                     new { id = "part-2", did = "did:test:456" }
-                }
+                },
+                totalCount = 2,
+                page = 1,
+                pageSize = 50,
+                hasMore = false
             });
         });
 
@@ -77,6 +85,7 @@ public sealed class OperonClientTests
             Assert.EndsWith("/v1/transactions", request.RequestUri!.AbsolutePath, StringComparison.Ordinal);
             var body = JsonSerializer.Deserialize<JsonElement>(request.Content!.ReadAsStringAsync().Result);
             Assert.Equal("signed-value", body.GetProperty("signature").GetProperty("value").GetString());
+            Assert.False(body.TryGetProperty("payloadData", out _));
             return StubHttpMessageHandler.Json(HttpStatusCode.OK, new
             {
                 id = "txn-1",
@@ -119,8 +128,8 @@ public sealed class OperonClientTests
         var handler = new StubHttpMessageHandler();
 
         handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new { access_token = BuildToken(new { participant_did = "did:test:999", channel_id = "chnl-9" }), expires_in = 300 }));
-        handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new { data = Array.Empty<object>() }));
-        handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new { data = Array.Empty<object>() }));
+        handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new { interactions = Array.Empty<object>(), totalCount = 0, page = 1, pageSize = 50, hasMore = false }));
+        handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new { participants = Array.Empty<object>(), totalCount = 0, page = 1, pageSize = 50, hasMore = false }));
         handler.Enqueue(request =>
         {
             var body = JsonSerializer.Deserialize<JsonElement>(request.Content!.ReadAsStringAsync().Result);

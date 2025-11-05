@@ -97,7 +97,6 @@ public sealed class OperonClient : IAsyncDisposable
             SourceDid = request.SourceDid!,
             TargetDid = request.TargetDid!,
             Signature = request.Signature,
-            PayloadData = payload.PayloadData,
             PayloadHash = payload.PayloadHash,
             Label = string.IsNullOrWhiteSpace(request.Label) ? null : request.Label,
             Tags = request.Tags?.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).ToArray()
@@ -231,7 +230,15 @@ public sealed class OperonClient : IAsyncDisposable
         var token = _cachedToken ?? await _tokenProvider.GetTokenAsync(cancellationToken).ConfigureAwait(false);
         _cachedToken = token;
 
-        using var interactionsRequest = new HttpRequestMessage(HttpMethod.Get, new Uri("v1/interactions", UriKind.Relative));
+        var channelId = Coalesce(token.ChannelId);
+        if (string.IsNullOrWhiteSpace(channelId))
+        {
+            throw new ValidationException("ChannelId is required to load registry data.");
+        }
+
+        var encodedChannel = Uri.EscapeDataString(channelId);
+
+        using var interactionsRequest = new HttpRequestMessage(HttpMethod.Get, new Uri($"v1/channels/{encodedChannel}/interactions", UriKind.Relative));
         interactionsRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
         using var interactionsResponse = await _httpClient.SendAsync(interactionsRequest, cancellationToken).ConfigureAwait(false);
         if (!interactionsResponse.IsSuccessStatusCode)
@@ -239,10 +246,10 @@ public sealed class OperonClient : IAsyncDisposable
             throw await DecodeErrorAsync(interactionsResponse).ConfigureAwait(false);
         }
 
-        var interactionsPayload = await interactionsResponse.Content.ReadFromJsonAsync<DataResponse<InteractionSummary>>(SerializerOptions, cancellationToken).ConfigureAwait(false)
-            ?? new DataResponse<InteractionSummary>();
+        var interactionsPayload = await interactionsResponse.Content.ReadFromJsonAsync<ChannelInteractionsResponse>(SerializerOptions, cancellationToken).ConfigureAwait(false)
+            ?? new ChannelInteractionsResponse();
 
-        using var participantsRequest = new HttpRequestMessage(HttpMethod.Get, new Uri("v1/participants", UriKind.Relative));
+        using var participantsRequest = new HttpRequestMessage(HttpMethod.Get, new Uri($"v1/channels/{encodedChannel}/participants", UriKind.Relative));
         participantsRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
         using var participantsResponse = await _httpClient.SendAsync(participantsRequest, cancellationToken).ConfigureAwait(false);
         if (!participantsResponse.IsSuccessStatusCode)
@@ -250,10 +257,10 @@ public sealed class OperonClient : IAsyncDisposable
             throw await DecodeErrorAsync(participantsResponse).ConfigureAwait(false);
         }
 
-        var participantsPayload = await participantsResponse.Content.ReadFromJsonAsync<DataResponse<ParticipantSummary>>(SerializerOptions, cancellationToken).ConfigureAwait(false)
-            ?? new DataResponse<ParticipantSummary>();
+        var participantsPayload = await participantsResponse.Content.ReadFromJsonAsync<ChannelParticipantsResponse>(SerializerOptions, cancellationToken).ConfigureAwait(false)
+            ?? new ChannelParticipantsResponse();
 
-        foreach (var interaction in interactionsPayload.Data)
+        foreach (var interaction in interactionsPayload.Interactions)
         {
             if (!string.IsNullOrWhiteSpace(interaction.SourceParticipantId) && participantsPayload.TryFind(interaction.SourceParticipantId, out var source))
             {
@@ -265,11 +272,11 @@ public sealed class OperonClient : IAsyncDisposable
             }
         }
 
-        _registry.UpdateParticipants(participantsPayload.Data);
-        _registry.UpdateInteractions(interactionsPayload.Data);
+        _registry.UpdateParticipants(participantsPayload.Participants);
+        _registry.UpdateInteractions(interactionsPayload.Interactions);
     }
 
-    private static (string? PayloadData, string PayloadHash) ResolvePayload(TransactionRequest request)
+    private static (byte[]? PayloadBytes, string PayloadHash) ResolvePayload(TransactionRequest request)
     {
         if (request.PayloadBytes is { Length: > 0 } bytes)
         {
@@ -278,7 +285,7 @@ public sealed class OperonClient : IAsyncDisposable
             {
                 throw new ValidationException("Provided payload hash does not match payload bytes.");
             }
-            return (Convert.ToBase64String(bytes), hash);
+            return (bytes, hash);
         }
 
         if (!string.IsNullOrWhiteSpace(request.PayloadHash))
@@ -415,8 +422,6 @@ public sealed class OperonClient : IAsyncDisposable
             = string.Empty;
         public required Signature Signature { get; init; }
             = new();
-        public string? PayloadData { get; init; }
-            = string.Empty;
         public required string PayloadHash { get; init; }
             = string.Empty;
         public string? Label { get; init; }
@@ -425,21 +430,31 @@ public sealed class OperonClient : IAsyncDisposable
             = Array.Empty<string>();
     }
 
-    private sealed record DataResponse<T>
+    private sealed record ChannelInteractionsResponse
     {
-        public IReadOnlyList<T> Data { get; init; } = Array.Empty<T>();
+        public IReadOnlyList<InteractionSummary> Interactions { get; init; } = Array.Empty<InteractionSummary>();
+        public int TotalCount { get; init; }
+        public int Page { get; init; }
+        public int PageSize { get; init; }
+        public bool HasMore { get; init; }
+    }
+
+    private sealed record ChannelParticipantsResponse
+    {
+        public IReadOnlyList<ParticipantSummary> Participants { get; init; } = Array.Empty<ParticipantSummary>();
+        public int TotalCount { get; init; }
+        public int Page { get; init; }
+        public int PageSize { get; init; }
+        public bool HasMore { get; init; }
 
         public bool TryFind(string id, out ParticipantSummary summary)
         {
-            if (typeof(T) == typeof(ParticipantSummary))
+            foreach (var participant in Participants)
             {
-                foreach (var item in Data)
+                if (participant.Id == id)
                 {
-                    if (item is ParticipantSummary participant && participant.Id == id)
-                    {
-                        summary = participant;
-                        return true;
-                    }
+                    summary = participant;
+                    return true;
                 }
             }
 

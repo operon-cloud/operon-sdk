@@ -38,26 +38,34 @@ async def test_submit_transaction_self_sign():
                 "expires_in": 300,
             },
         )
-        mock.get("/api/v1/interactions").return_value = Response(
+        mock.get("/api/v1/channels/chnl/interactions").return_value = Response(
             200,
             json={
-                "data": [
+                "interactions": [
                     {
                         "id": "int-123",
                         "channelId": "chnl",
                         "sourceParticipantId": "part-1",
                         "targetParticipantId": "part-2",
                     }
-                ]
+                ],
+                "totalCount": 1,
+                "page": 1,
+                "pageSize": 50,
+                "hasMore": False,
             },
         )
-        mock.get("/api/v1/participants").return_value = Response(
+        mock.get("/api/v1/channels/chnl/participants").return_value = Response(
             200,
             json={
-                "data": [
+                "participants": [
                     {"id": "part-1", "did": "did:test:123"},
                     {"id": "part-2", "did": "did:test:456"},
-                ]
+                ],
+                "totalCount": 2,
+                "page": 1,
+                "pageSize": 50,
+                "hasMore": False,
             },
         )
         mock.post("/api/v1/dids/self/sign").return_value = Response(
@@ -119,8 +127,14 @@ async def test_submit_transaction_manual_signature():
                 "expires_in": 300,
             },
         )
-        mock.get("/api/v1/interactions").return_value = Response(200, json={"data": []})
-        mock.get("/api/v1/participants").return_value = Response(200, json={"data": []})
+        mock.get("/api/v1/channels/chnl/interactions").return_value = Response(
+            200,
+            json={"interactions": [], "totalCount": 0, "page": 1, "pageSize": 50, "hasMore": False},
+        )
+        mock.get("/api/v1/channels/chnl/participants").return_value = Response(
+            200,
+            json={"participants": [], "totalCount": 0, "page": 1, "pageSize": 50, "hasMore": False},
+        )
         mock.post("/api/v1/transactions").return_value = Response(
             200,
             json={
