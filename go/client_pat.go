@@ -1,11 +1,14 @@
 package operon
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -113,7 +116,7 @@ func SubmitTransactionWithPAT(ctx context.Context, cfg ClientAPIConfig, pat stri
 		}
 	}
 
-	payloadData, payloadHash, err := req.resolvePayload()
+	_, payloadHash, err := req.resolvePayload()
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +149,6 @@ func SubmitTransactionWithPAT(ctx context.Context, cfg ClientAPIConfig, pat stri
 		SourceDID:     req.SourceDID,
 		TargetDID:     req.TargetDID,
 		Signature:     req.Signature,
-		PayloadData:   payloadData,
 		PayloadHash:   payloadHash,
 	}
 	if sanitizedLabel != "" {
@@ -182,6 +184,61 @@ func SubmitTransactionWithPAT(ctx context.Context, cfg ClientAPIConfig, pat stri
 	}
 
 	return &txn, nil
+}
+
+// ValidateSignatureWithPAT verifies Operon signature headers against the provided payload using the caller's PAT.
+func ValidateSignatureWithPAT(ctx context.Context, cfg ClientAPIConfig, pat string, payload []byte, headers OperonHeaders) (*SignatureValidationResult, error) {
+	pat = strings.TrimSpace(pat)
+	if pat == "" {
+		return nil, errors.New("pat is required")
+	}
+
+	sanitized, err := sanitizeOperonHeaders(headers)
+	if err != nil {
+		return nil, err
+	}
+
+	hash := sha256.Sum256(payload)
+	computedHash := base64.RawURLEncoding.EncodeToString(hash[:])
+	expectedHash := sanitized[HeaderOperonPayloadHash]
+	if !strings.EqualFold(computedHash, expectedHash) {
+		return nil, fmt.Errorf("payload hash mismatch: expected %s, got %s", computedHash, expectedHash)
+	}
+
+	normalized, httpClient := normalizeClientAPIConfig(cfg)
+
+	did := sanitized[HeaderOperonDID]
+	path := fmt.Sprintf("%s/v1/dids/%s/signature/verify", normalized.BaseURL, url.PathEscape(did))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, path, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+pat)
+	for key, value := range sanitized {
+		req.Header.Set(key, value)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("perform signature validation request: %w", err)
+	}
+	defer closeSilently(resp)
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		apiErr, decodeErr := apierrors.Decode(resp)
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+		return nil, apiErr
+	}
+
+	return decodeValidationResponse(resp)
+}
+
+// ValidateSignatureWithPATFromString accepts a string payload for convenience.
+func ValidateSignatureWithPATFromString(ctx context.Context, cfg ClientAPIConfig, pat string, payload string, headers OperonHeaders) (*SignatureValidationResult, error) {
+	return ValidateSignatureWithPAT(ctx, cfg, pat, []byte(payload), headers)
 }
 
 // DecodePayloadBase64 decodes a standard base64-encoded payload string so callers can populate TransactionRequest.Payload.

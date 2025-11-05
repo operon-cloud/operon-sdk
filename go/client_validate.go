@@ -66,11 +66,6 @@ func (c *Client) ValidateSignatureHeaders(ctx context.Context, payload []byte, h
 	}
 	defer closeSilently(resp)
 
-	if resp.StatusCode == http.StatusNotFound {
-		closeSilently(resp)
-		return c.validateViaLegacyDemoEndpoint(ctx, token, payload, sanitized)
-	}
-
 	if resp.StatusCode >= http.StatusBadRequest {
 		apiErr, decodeErr := apierrors.Decode(resp)
 		if decodeErr != nil {
@@ -110,33 +105,6 @@ func sanitizeOperonHeaders(headers OperonHeaders) (map[string]string, error) {
 	}
 
 	return result, nil
-}
-
-func (c *Client) validateViaLegacyDemoEndpoint(ctx context.Context, token string, payload []byte, headers map[string]string) (*SignatureValidationResult, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v1/demo/signatures", bytes.NewReader(payload))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("POST /v1/demo/signatures: %w", err)
-	}
-	defer closeSilently(resp)
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		apiErr, decodeErr := apierrors.Decode(resp)
-		if decodeErr != nil {
-			return nil, decodeErr
-		}
-		return nil, apiErr
-	}
-
-	return decodeValidationResponse(resp)
 }
 
 func decodeValidationResponse(resp *http.Response) (*SignatureValidationResult, error) {

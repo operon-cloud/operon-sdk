@@ -89,7 +89,6 @@ type transactionSubmission struct {
 	SourceDID     string    `json:"sourceDid"`
 	TargetDID     string    `json:"targetDid"`
 	Signature     Signature `json:"signature"`
-	PayloadData   string    `json:"payloadData,omitempty"`
 	PayloadHash   string    `json:"payloadHash"`
 	Label         string    `json:"label,omitempty"`
 	Tags          []string  `json:"tags,omitempty"`

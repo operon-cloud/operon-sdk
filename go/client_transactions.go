@@ -22,7 +22,7 @@ func (c *Client) SubmitTransaction(ctx context.Context, req TransactionRequest) 
 		return nil, err
 	}
 
-	payloadData, payloadHash, err := req.resolvePayload()
+	_, payloadHash, err := req.resolvePayload()
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,6 @@ func (c *Client) SubmitTransaction(ctx context.Context, req TransactionRequest) 
 		SourceDID:     req.SourceDID,
 		TargetDID:     req.TargetDID,
 		Signature:     signature,
-		PayloadData:   payloadData,
 		PayloadHash:   payloadHash,
 	}
 	if sanitizedLabel != "" {

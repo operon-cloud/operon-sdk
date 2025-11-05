@@ -64,20 +64,23 @@ func main() {
 		log.Fatalf("bootstrap session: %v", err)
 	}
 
-	txn, err := client.SubmitTransaction(ctx, operon.TransactionRequest{
-		InteractionID:  "int-123",
-		CorrelationID:  "lead-abc",
-		Label:          "Sales lead ingestion",
-		Payload:        []byte(`{"leadId":"lead-abc","useCase":"B2B onboarding"}`),
+txn, err := client.SubmitTransaction(ctx, operon.TransactionRequest{
+	InteractionID:  "int-123",
+	CorrelationID:  "lead-abc",
+	Label:          "Sales lead ingestion",
+	Payload:        []byte(`{"leadId":"lead-abc","useCase":"B2B onboarding"}`),
 		Tags:           []string{"channel:corporate-api", "priority:high"},
 	})
 	if err != nil {
 		log.Fatalf("submit transaction: %v", err)
 	}
 
-	log.Printf("transaction accepted (id=%s status=%s)", txn.ID, txn.Status)
+log.Printf("transaction accepted (id=%s status=%s)", txn.ID, txn.Status)
 }
 ```
+
+> **Security Note**  
+> The Go SDK computes a SHA-256 hash of any `Payload` you supply and submits only the hash to Operon. Raw payload bytes remain inside your service boundary.
 
 ### Configuration Reference
 

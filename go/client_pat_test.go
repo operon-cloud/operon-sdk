@@ -2,7 +2,10 @@ package operon_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -77,8 +80,13 @@ func TestSubmitTransactionWithPATSuccess(t *testing.T) {
 		require.Equal(t, http.MethodPost, r.Method)
 		require.Equal(t, "Bearer "+pat, r.Header.Get("Authorization"))
 
+		payloadBytes, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+
 		var body map[string]any
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.NoError(t, json.Unmarshal(payloadBytes, &body))
+		_, hasPayloadData := body["payloadData"]
+		require.False(t, hasPayloadData, "payloadData must not be transmitted")
 		require.Equal(t, "channel-123", body["channelId"])
 		require.Equal(t, "interaction-xyz", body["interactionId"])
 		require.Equal(t, "did:example:source", body["sourceDid"])
@@ -151,6 +159,97 @@ func TestSubmitTransactionWithPATAPIFailure(t *testing.T) {
 	if apiErr, ok := err.(*operon.APIError); ok {
 		require.Equal(t, http.StatusForbidden, apiErr.StatusCode)
 		require.Equal(t, "FORBIDDEN", apiErr.Code)
+	} else {
+		t.Fatalf("expected APIError, got %T", err)
+	}
+}
+
+func TestValidateSignatureWithPATSuccess(t *testing.T) {
+	pat := newToken("did:example:source")
+	payload := []byte(`{"message":"hello"}`)
+	hash := sha256.Sum256(payload)
+	payloadHash := base64.RawURLEncoding.EncodeToString(hash[:])
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/v1/dids/did:example:source/signature/verify", r.URL.Path)
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "Bearer "+pat, r.Header.Get("Authorization"))
+		require.Equal(t, payloadHash, r.Header.Get(operon.HeaderOperonPayloadHash))
+		require.Equal(t, "did:example:source", r.Header.Get(operon.HeaderOperonDID))
+		require.Equal(t, "signed-value", r.Header.Get(operon.HeaderOperonSignature))
+		require.Equal(t, "did:example:source#key-1", r.Header.Get(operon.HeaderOperonSignatureKey))
+		require.Equal(t, "EdDSA", r.Header.Get(operon.HeaderOperonSignatureAlgo))
+
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"status":      "VALID",
+			"message":     "Signature valid",
+			"did":         "did:example:source",
+			"payloadHash": payloadHash,
+			"algorithm":   "EdDSA",
+			"keyId":       "did:example:source#key-1",
+		}))
+	}))
+	defer server.Close()
+
+	headers := operon.OperonHeaders{
+		operon.HeaderOperonDID:           "did:example:source",
+		operon.HeaderOperonPayloadHash:   payloadHash,
+		operon.HeaderOperonSignature:     "signed-value",
+		operon.HeaderOperonSignatureKey:  "did:example:source#key-1",
+		operon.HeaderOperonSignatureAlgo: "EdDSA",
+	}
+
+	result, err := operon.ValidateSignatureWithPAT(context.Background(), operon.ClientAPIConfig{BaseURL: server.URL}, pat, payload, headers)
+	require.NoError(t, err)
+	require.Equal(t, "VALID", result.Status)
+	require.Equal(t, "Signature valid", result.Message)
+	require.Equal(t, "did:example:source", result.DID)
+	require.Equal(t, payloadHash, result.PayloadHash)
+	require.Equal(t, "EdDSA", result.Algorithm)
+	require.Equal(t, "did:example:source#key-1", result.KeyID)
+}
+
+func TestValidateSignatureWithPATHashMismatch(t *testing.T) {
+	pat := newToken("did:example:source")
+	payload := []byte(`{"message":"hello"}`)
+	headers := operon.OperonHeaders{
+		operon.HeaderOperonDID:           "did:example:source",
+		operon.HeaderOperonPayloadHash:   "invalid-hash",
+		operon.HeaderOperonSignature:     "signed-value",
+		operon.HeaderOperonSignatureKey:  "did:example:source#key-1",
+		operon.HeaderOperonSignatureAlgo: "EdDSA",
+	}
+
+	_, err := operon.ValidateSignatureWithPAT(context.Background(), operon.ClientAPIConfig{BaseURL: "https://example.com"}, pat, payload, headers)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "payload hash mismatch")
+}
+
+func TestValidateSignatureWithPATAPIFailure(t *testing.T) {
+	pat := newToken("did:example:source")
+	payload := []byte(`{"message":"hello"}`)
+	hash := sha256.Sum256(payload)
+	payloadHash := base64.RawURLEncoding.EncodeToString(hash[:])
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]any{"code": "UNAUTHORIZED", "message": "invalid"})
+	}))
+	defer server.Close()
+
+	headers := operon.OperonHeaders{
+		operon.HeaderOperonDID:           "did:example:source",
+		operon.HeaderOperonPayloadHash:   payloadHash,
+		operon.HeaderOperonSignature:     "signed-value",
+		operon.HeaderOperonSignatureKey:  "did:example:source#key-1",
+		operon.HeaderOperonSignatureAlgo: "EdDSA",
+	}
+
+	_, err := operon.ValidateSignatureWithPAT(context.Background(), operon.ClientAPIConfig{BaseURL: server.URL}, pat, payload, headers)
+	require.Error(t, err)
+	if apiErr, ok := err.(*operon.APIError); ok {
+		require.Equal(t, http.StatusUnauthorized, apiErr.StatusCode)
+		require.Equal(t, "UNAUTHORIZED", apiErr.Code)
 	} else {
 		t.Fatalf("expected APIError, got %T", err)
 	}

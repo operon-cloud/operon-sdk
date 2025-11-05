@@ -1,7 +1,6 @@
 package operon_test
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -33,7 +32,6 @@ type transactionSubmission struct {
 	Timestamp     string           `json:"timestamp"`
 	SourceDID     string           `json:"sourceDid"`
 	TargetDID     string           `json:"targetDid"`
-	PayloadData   string           `json:"payloadData,omitempty"`
 	PayloadHash   string           `json:"payloadHash"`
 	Signature     operon.Signature `json:"signature"`
 	Tags          []string         `json:"tags,omitempty"`
@@ -119,7 +117,16 @@ func TestClientSubmitTransactionWithSelfSigning(t *testing.T) {
 		case "/v1/transactions":
 			require.Equal(t, http.MethodPost, r.Method)
 			require.Equal(t, "application/json", r.Header.Get("Content-Type"))
-			require.NoError(t, json.NewDecoder(r.Body).Decode(&captured))
+
+			payloadBytes, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+
+			var payloadMap map[string]any
+			require.NoError(t, json.Unmarshal(payloadBytes, &payloadMap))
+			_, hasPayloadData := payloadMap["payloadData"]
+			require.False(t, hasPayloadData, "payloadData must not be transmitted")
+
+			require.NoError(t, json.Unmarshal(payloadBytes, &captured))
 
 			now := time.Now().UTC()
 			response := map[string]any{
@@ -384,8 +391,6 @@ func TestValidateSignatureHeadersSuccess(t *testing.T) {
 				"keyId":       "did:example:source#keys-1",
 			}
 			require.NoError(t, json.NewEncoder(w).Encode(respPayload))
-		case "/v1/demo/signatures":
-			t.Fatalf("unexpected fall back to demo endpoint")
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -463,57 +468,6 @@ func TestValidateSignatureHeadersRequiresHeaders(t *testing.T) {
 
 	_, err := client.ValidateSignatureHeaders(ctx, []byte("payload"), nil)
 	require.Error(t, err)
-}
-
-func TestValidateSignatureHeadersFallsBackToDemoEndpoint(t *testing.T) {
-	payload := []byte(`{"demo":true}`)
-	digest := sha256.Sum256(payload)
-	expectedHash := base64.RawURLEncoding.EncodeToString(digest[:])
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/token":
-			resp := tokenResponse{AccessToken: newToken("did:example:receiver"), TokenType: "Bearer", ExpiresIn: 3600}
-			require.NoError(t, json.NewEncoder(w).Encode(resp))
-		case fmt.Sprintf("/v1/dids/%s/signature/verify", url.PathEscape("did:example:source")):
-			w.WriteHeader(http.StatusNotFound)
-		case "/v1/demo/signatures":
-			var body bytes.Buffer
-			_, err := body.ReadFrom(r.Body)
-			require.NoError(t, err)
-			require.Equal(t, payload, body.Bytes())
-
-			resp := map[string]any{
-				"status":      "VALID",
-				"message":     "legacy",
-				"did":         "did:example:source",
-				"payloadHash": expectedHash,
-				"algorithm":   operon.AlgorithmEd25519,
-				"keyId":       "did:example:source#keys-1",
-			}
-			require.NoError(t, json.NewEncoder(w).Encode(resp))
-		default:
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-	})
-
-	client, cleanup := newTestClient(t, handler, operon.Config{})
-	defer cleanup()
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	headers := operon.OperonHeaders{
-		operon.HeaderOperonDID:           "did:example:source",
-		operon.HeaderOperonPayloadHash:   expectedHash,
-		operon.HeaderOperonSignature:     "signed",
-		operon.HeaderOperonSignatureKey:  "did:example:source#keys-1",
-		operon.HeaderOperonSignatureAlgo: operon.AlgorithmEd25519,
-	}
-
-	result, err := client.ValidateSignatureHeaders(ctx, payload, headers)
-	require.NoError(t, err)
-	require.Equal(t, "legacy", result.Message)
 }
 
 func newTokenWithClaims(claims map[string]any) string {

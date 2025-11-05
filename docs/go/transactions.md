@@ -55,7 +55,7 @@ req := operon.TransactionRequest{
 
 Key points:
 
-- Provide either `Payload` (bytes) or `PayloadHash` (base64url SHA-256). The SDK calculates the hash automatically when `Payload` is supplied.
+- Provide either `Payload` (bytes) or `PayloadHash` (base64url SHA-256). The SDK calculates the hash locally when `Payload` is supplied and **only** transmits the hash to Operon; raw payload bytes never leave your service.
 - When interaction metadata is cached, the SDK fills `ChannelID`, `SourceDID`, and `TargetDID` automatically. Provide them explicitly if you disable cache usage.
 - `CorrelationID` enforces idempotency. Choose a deterministic value per logical transaction.
 
@@ -73,7 +73,7 @@ fmt.Printf("status: %s\n", txn.Status)
 
 The SDK will:
 
-1. Base64-encode the payload and compute its SHA-256 hash.
+1. Compute the payload’s SHA-256 hash locally (without sending the raw payload to Operon).
 2. Call the managed signing endpoint (unless `DisableSelfSign` is set and you supply your own signature).
 3. Populate missing interaction metadata using the warmed registry.
 4. Submit the request to `/v1/transactions`.
