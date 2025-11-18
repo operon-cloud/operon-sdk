@@ -39,6 +39,7 @@ type Token struct {
 // Provider exposes the contract for retrieving access tokens.
 type Provider interface {
 	Token(ctx context.Context) (Token, error)
+	ForceRefresh(ctx context.Context) (Token, error)
 }
 
 // ClientCredentialsConfig defines the inputs required to mint tokens using the
@@ -130,6 +131,18 @@ func (m *ClientCredentialsManager) Token(ctx context.Context) (Token, error) {
 		return Token{}, err
 	}
 
+	m.mu.Lock()
+	m.cached = &fresh
+	m.mu.Unlock()
+	return fresh, nil
+}
+
+// ForceRefresh bypasses cached tokens and immediately mints a new PAT.
+func (m *ClientCredentialsManager) ForceRefresh(ctx context.Context) (Token, error) {
+	fresh, err := m.fetchToken(ctx)
+	if err != nil {
+		return Token{}, err
+	}
 	m.mu.Lock()
 	m.cached = &fresh
 	m.mu.Unlock()

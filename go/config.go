@@ -18,6 +18,8 @@ const (
 	// defaultTokenLeeway subtracts this duration from expires_in to refresh tokens proactively.
 	defaultTokenLeeway = 30 * time.Second
 	defaultKeyIDSuffix = "#keys-1"
+	// defaultHeartbeatTimeout caps how long heartbeat calls may run.
+	defaultHeartbeatTimeout = 10 * time.Second
 )
 
 // Config encapsulates the options required to instantiate a Client.
@@ -32,6 +34,12 @@ type Config struct {
 	TokenLeeway      time.Duration
 	DisableSelfSign  bool
 	SigningAlgorithm string
+	// SessionHeartbeatInterval enables background keep-alive checks when greater than zero.
+	SessionHeartbeatInterval time.Duration
+	// SessionHeartbeatTimeout overrides the timeout per heartbeat call.
+	SessionHeartbeatTimeout time.Duration
+	// SessionHeartbeatURL customizes the heartbeat endpoint; defaults to BaseURL + /v1/session/heartbeat.
+	SessionHeartbeatURL string
 }
 
 // Validate performs basic sanity checks on the configuration and fills defaults for optional fields.
@@ -77,6 +85,29 @@ func (c *Config) Validate() error {
 		c.SigningAlgorithm = canonical
 	} else {
 		return fmt.Errorf("unsupported SigningAlgorithm %s", alg)
+	}
+
+	if c.SessionHeartbeatInterval < 0 {
+		return errors.New("SessionHeartbeatInterval cannot be negative")
+	}
+	if c.SessionHeartbeatInterval > 0 {
+		timeout := c.SessionHeartbeatTimeout
+		if timeout <= 0 {
+			timeout = defaultHeartbeatTimeout
+		}
+		c.SessionHeartbeatTimeout = timeout
+
+		heartbeatURL := strings.TrimSpace(c.SessionHeartbeatURL)
+		if heartbeatURL == "" {
+			heartbeatURL = c.BaseURL + "/v1/session/heartbeat"
+		}
+		if _, err := url.ParseRequestURI(heartbeatURL); err != nil {
+			return fmt.Errorf("invalid SessionHeartbeatURL: %w", err)
+		}
+		c.SessionHeartbeatURL = strings.TrimRight(heartbeatURL, "/")
+	} else {
+		c.SessionHeartbeatTimeout = 0
+		c.SessionHeartbeatURL = ""
 	}
 
 	return nil

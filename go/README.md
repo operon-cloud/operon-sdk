@@ -46,6 +46,8 @@ ctx := context.Background()
 client, err := operon.NewClient(operon.Config{
     ClientID:     os.Getenv("OPERON_CLIENT_ID"),
     ClientSecret: os.Getenv("OPERON_CLIENT_SECRET"),
+    // Optional: keep long-running workloads alive by pinging session heartbeat.
+    SessionHeartbeatInterval: 2 * time.Minute,
 })
 if err != nil {
     log.Fatalf("build client: %v", err)
@@ -70,6 +72,24 @@ With an initialised client you can choose the scenario that matches your workloa
 - PAT-only helpers: use `SignHashWithPAT` and `SubmitTransactionWithPAT` when you already have a sandbox-issued PAT and want to avoid storing client secrets.
 
 Both guides include full code samples, error-handling tips, and troubleshooting checklists.
+
+## Session keep-alive & token refresh
+
+Long-running services often hold PATs for hours. The SDK now includes an
+optional keep-alive loop that re-validates the PAT against the Client API and
+forces an immediate refresh if the platform reports the token as expired.
+
+Enable it by setting `SessionHeartbeatInterval` when constructing the client.
+The SDK will:
+
+1. Reuse the cached PAT from the underlying token manager.
+2. Call `GET {BaseURL}/v1/session/heartbeat` on the configured interval.
+3. If the server returns `401`, force-mint a fresh PAT via the client-credentials
+   grant so subsequent requests succeed without manual retries.
+
+Heartbeat defaults to disabled to avoid extra network chatter. Set the interval
+to a value such as `2 * time.Minute` when your integration benefits from
+proactive refreshes (e.g., headless daemons processing events continuously).
 
 ## Error handling
 

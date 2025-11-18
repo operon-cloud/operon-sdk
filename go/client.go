@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/operon-cloud/operon-sdk/go/internal/auth"
 	"github.com/operon-cloud/operon-sdk/go/internal/catalog"
@@ -29,6 +30,13 @@ type Client struct {
 
 	initOnce sync.Once
 	initErr  error
+
+	heartbeatInterval time.Duration
+	heartbeatTimeout  time.Duration
+	heartbeatURL      string
+	heartbeatOnce     sync.Once
+	heartbeatCancel   context.CancelFunc
+	heartbeatWG       sync.WaitGroup
 
 	referenceMu     sync.Mutex
 	referenceLoaded bool
@@ -85,13 +93,16 @@ func NewClient(cfg Config) (*Client, error) {
 	}
 
 	return &Client{
-		baseURL:          cfgCopy.BaseURL,
-		http:             httpClient,
-		tokens:           tokenProvider,
-		signer:           signer,
-		registry:         catalog.NewRegistry(),
-		signingAlgorithm: cfgCopy.SigningAlgorithm,
-		selfSigning:      selfSigning,
+		baseURL:           cfgCopy.BaseURL,
+		http:              httpClient,
+		tokens:            tokenProvider,
+		signer:            signer,
+		registry:          catalog.NewRegistry(),
+		signingAlgorithm:  cfgCopy.SigningAlgorithm,
+		selfSigning:       selfSigning,
+		heartbeatInterval: cfgCopy.SessionHeartbeatInterval,
+		heartbeatTimeout:  cfgCopy.SessionHeartbeatTimeout,
+		heartbeatURL:      cfgCopy.SessionHeartbeatURL,
 	}, nil
 }
 
@@ -104,6 +115,7 @@ func (c *Client) Init(ctx context.Context) error {
 			c.initErr = err
 			return
 		}
+		c.startHeartbeat()
 	})
 	return c.initErr
 }
@@ -112,6 +124,7 @@ func (c *Client) Init(ctx context.Context) error {
 // require explicit closure, but the method exists to preserve forward
 // compatibility with future transport options.
 func (c *Client) Close() error {
+	c.stopHeartbeat()
 	return nil
 }
 
