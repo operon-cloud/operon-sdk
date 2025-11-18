@@ -1,11 +1,13 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use chrono::{DateTime, Utc};
 use reqwest::{Client, StatusCode, Url};
 use serde_json;
-use tokio::sync::RwLock;
+use tokio::sync::{watch, RwLock};
+use tokio::task::JoinHandle;
 use urlencoding::encode;
 
 use crate::auth::{AccessToken, ClientCredentialsTokenProvider};
@@ -26,6 +28,8 @@ pub struct OperonClient {
     token_provider: Arc<ClientCredentialsTokenProvider>,
     interactions: Arc<RwLock<Option<Vec<InteractionSummary>>>>,
     participants: Arc<RwLock<Option<Vec<ParticipantSummary>>>>,
+    heartbeat_tx: watch::Sender<bool>,
+    heartbeat_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 impl OperonClient {
@@ -35,18 +39,59 @@ impl OperonClient {
             .build()
             .map_err(OperonError::Transport)?;
         let provider = ClientCredentialsTokenProvider::new(config.clone(), http.clone());
+        let (tx, _rx) = watch::channel(false);
         Ok(Self {
             config,
             http,
             token_provider: Arc::new(provider),
             interactions: Arc::new(RwLock::new(None)),
             participants: Arc::new(RwLock::new(None)),
+            heartbeat_tx: tx,
+            heartbeat_handle: Arc::new(Mutex::new(None)),
         })
     }
 
     pub async fn init(&self) -> Result<(), OperonError> {
         let _ = self.token_provider.token().await?;
+        self.start_heartbeat();
         Ok(())
+    }
+
+    fn start_heartbeat(&self) {
+        let Some(url) = self.config.session_heartbeat_url.clone() else {
+            return;
+        };
+        if self.config.session_heartbeat_interval.is_zero() {
+            return;
+        }
+
+        let mut guard = self.heartbeat_handle.lock().unwrap();
+        if guard.is_some() {
+            return;
+        }
+
+        let mut rx = self.heartbeat_tx.subscribe();
+        let interval = self.config.session_heartbeat_interval;
+        let timeout = self.config.session_heartbeat_timeout;
+        let client = self.http.clone();
+        let provider = self.token_provider.clone();
+
+        *guard = Some(tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = rx.changed() => {
+                        if *rx.borrow() {
+                            break;
+                        }
+                    }
+                    _ = tokio::time::sleep(interval) => {
+                        if let Err(err) = heartbeat_once(&client, &provider, &url, timeout).await {
+                            eprintln!("[operon-sdk] heartbeat error: {err}");
+                        }
+                    }
+                }
+            }
+        }));
     }
 
     pub async fn submit_transaction(
@@ -363,6 +408,36 @@ fn validate_request(request: &TransactionRequest) -> Result<(), OperonError> {
     }
     if request.signature.as_ref().unwrap().value.trim().is_empty() {
         return Err(OperonError::validation("signature value required"));
+    }
+    Ok(())
+}
+
+impl Drop for OperonClient {
+    fn drop(&mut self) {
+        let _ = self.heartbeat_tx.send(true);
+        if let Some(handle) = self.heartbeat_handle.lock().unwrap().take() {
+            handle.abort();
+        }
+    }
+}
+
+async fn heartbeat_once(
+    client: &Client,
+    provider: &ClientCredentialsTokenProvider,
+    url: &Url,
+    timeout: Duration,
+) -> Result<(), OperonError> {
+    let token = provider.token().await?;
+    let response = client
+        .get(url.clone())
+        .bearer_auth(&token.value)
+        .timeout(timeout)
+        .send()
+        .await
+        .map_err(OperonError::Transport)?;
+
+    if response.status() == StatusCode::UNAUTHORIZED {
+        provider.force_refresh().await?;
     }
     Ok(())
 }

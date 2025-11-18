@@ -7,6 +7,7 @@ const DEFAULT_BASE_URL: &str = "https://api.operon.cloud/client-api/";
 const DEFAULT_TOKEN_URL: &str = "https://auth.operon.cloud/oauth2/token";
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 const DEFAULT_TOKEN_LEEWAY: Duration = Duration::from_secs(30);
+const DEFAULT_HEARTBEAT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone)]
 pub struct OperonConfig {
@@ -19,6 +20,9 @@ pub struct OperonConfig {
     pub http_timeout: Duration,
     pub token_leeway: Duration,
     pub disable_self_sign: bool,
+    pub session_heartbeat_interval: Duration,
+    pub session_heartbeat_timeout: Duration,
+    pub session_heartbeat_url: Option<Url>,
 }
 
 impl OperonConfig {
@@ -38,6 +42,9 @@ pub struct OperonConfigBuilder {
     http_timeout: Option<Duration>,
     token_leeway: Option<Duration>,
     disable_self_sign: bool,
+    session_heartbeat_interval: Option<Duration>,
+    session_heartbeat_timeout: Option<Duration>,
+    session_heartbeat_url: Option<Url>,
 }
 
 impl OperonConfigBuilder {
@@ -99,6 +106,21 @@ impl OperonConfigBuilder {
         self
     }
 
+    pub fn session_heartbeat_interval(mut self, value: Duration) -> Self {
+        self.session_heartbeat_interval = Some(value);
+        self
+    }
+
+    pub fn session_heartbeat_timeout(mut self, value: Duration) -> Self {
+        self.session_heartbeat_timeout = Some(value);
+        self
+    }
+
+    pub fn session_heartbeat_url(mut self, value: impl AsRef<str>) -> Self {
+        self.session_heartbeat_url = Some(url(value));
+        self
+    }
+
     pub fn build(self) -> Result<OperonConfig, ConfigError> {
         let client_id = self
             .client_id
@@ -125,6 +147,22 @@ impl OperonConfigBuilder {
         let http_timeout = self.http_timeout.unwrap_or(DEFAULT_TIMEOUT);
         let token_leeway = self.token_leeway.unwrap_or(DEFAULT_TOKEN_LEEWAY);
 
+        let heartbeat_interval = self
+            .session_heartbeat_interval
+            .unwrap_or(Duration::from_secs(0));
+        let heartbeat_timeout = self
+            .session_heartbeat_timeout
+            .unwrap_or(DEFAULT_HEARTBEAT_TIMEOUT);
+        let heartbeat_url = if heartbeat_interval > Duration::from_secs(0) {
+            Some(self.session_heartbeat_url.unwrap_or_else(|| {
+                let mut url = base_url.clone();
+                url.set_path("v1/session/heartbeat");
+                url
+            }))
+        } else {
+            None
+        };
+
         Ok(OperonConfig {
             base_url,
             token_url,
@@ -135,6 +173,9 @@ impl OperonConfigBuilder {
             http_timeout,
             token_leeway,
             disable_self_sign: self.disable_self_sign,
+            session_heartbeat_interval: heartbeat_interval,
+            session_heartbeat_timeout: heartbeat_timeout,
+            session_heartbeat_url: heartbeat_url,
         })
     }
 }

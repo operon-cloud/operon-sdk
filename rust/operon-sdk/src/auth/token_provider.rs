@@ -61,6 +61,13 @@ impl ClientCredentialsTokenProvider {
         *guard = None;
     }
 
+    pub async fn force_refresh(&self) -> Result<AccessToken, OperonError> {
+        let fresh = self.fetch_token().await?;
+        let mut guard = self.cache.lock().await;
+        *guard = Some(fresh.clone());
+        Ok(fresh)
+    }
+
     async fn fetch_token(&self) -> Result<AccessToken, OperonError> {
         let request = self.build_request()?;
         let response = self

@@ -6,7 +6,7 @@ Idiomatic Rust client for the [Operon.Cloud](https://www.operon.cloud) platform 
 
 ```toml
 [dependencies]
-operon-sdk = "1.0.1"
+operon-sdk = "1.0.2"
 ```
 
 ```rust
@@ -35,6 +35,18 @@ println!("transaction {} status={}", txn.id, txn.status);
 
 > **Security note**
 > The Rust SDK mirrors the Go implementation: it computes a SHA-256 hash locally and only sends the hash (`payloadHash`) to Operon. Raw payload bytes never leave your service.
+
+### Optional session keep-alive
+
+Long-lived daemons can configure a heartbeat so the SDK pings `/v1/session/heartbeat` and forces a token refresh when Operon responds with 401:
+
+```rust
+let config = OperonConfig::builder()
+    .client_id("client")
+    .client_secret("secret")
+    .session_heartbeat_interval(std::time::Duration::from_secs(120))
+    .build()?;
+```
 
 ## Development
 

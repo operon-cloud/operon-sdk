@@ -12,6 +12,47 @@ fn build_token(claims: serde_json::Value) -> String {
 }
 
 #[tokio::test]
+async fn heartbeat_forces_refresh_on_unauthorized() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/oauth/token"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "access_token": build_token(serde_json::json!({"tenant":"one"})),
+            "expires_in": 300
+        })))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/v1/session/heartbeat"))
+        .respond_with(ResponseTemplate::new(401))
+        .mount(&server)
+        .await;
+
+    let config = OperonConfig::builder()
+        .client_id("client")
+        .client_secret("secret")
+        .base_url(server.uri())
+        .token_url(server.uri() + "/oauth/token")
+        .session_heartbeat_interval(std::time::Duration::from_millis(50))
+        .build()
+        .unwrap();
+
+    let client = OperonClient::new(config).unwrap();
+    client.init().await.unwrap();
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    drop(client);
+
+    let requests = server.received_requests().await.unwrap();
+    let token_hits = requests
+        .iter()
+        .filter(|req| req.url.path() == "/oauth/token")
+        .count();
+    assert!(token_hits >= 2);
+}
+
+#[tokio::test]
 async fn submit_transaction_self_sign() {
     let server = MockServer::start().await;
 

@@ -18,6 +18,9 @@ fn config_defaults() {
     );
     assert_eq!(config.http_timeout.as_secs(), 30);
     assert_eq!(config.token_leeway.as_secs(), 30);
+    assert_eq!(config.session_heartbeat_interval.as_secs(), 0);
+    assert_eq!(config.session_heartbeat_timeout.as_secs(), 10);
+    assert!(config.session_heartbeat_url.is_none());
 }
 
 #[test]
@@ -30,4 +33,23 @@ fn config_requires_credentials() {
         err,
         operon_sdk::config::ConfigError::MissingField("client_id")
     ));
+}
+
+#[test]
+fn config_heartbeat_customisation() {
+    let config = OperonConfig::builder()
+        .client_id("client")
+        .client_secret("secret")
+        .session_heartbeat_interval(std::time::Duration::from_secs(60))
+        .session_heartbeat_timeout(std::time::Duration::from_secs(5))
+        .session_heartbeat_url("https://internal.example.com/hb")
+        .build()
+        .unwrap();
+
+    assert_eq!(config.session_heartbeat_interval.as_secs(), 60);
+    assert_eq!(config.session_heartbeat_timeout.as_secs(), 5);
+    assert_eq!(
+        config.session_heartbeat_url.unwrap().as_str(),
+        "https://internal.example.com/hb"
+    );
 }

@@ -85,3 +85,42 @@ async fn token_provider_refreshes_when_expired() {
     sleep(Duration::from_secs(2)).await;
     let _second = provider.token().await.unwrap();
 }
+
+#[tokio::test]
+async fn token_provider_force_refresh_bypasses_cache() {
+    let mock_server = MockServer::start().await;
+    let token_url = mock_server.uri() + "/oauth/token";
+
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "access_token": build_token(serde_json::json!({"nonce":"one"})),
+            "expires_in": 300,
+            "token_type": "Bearer"
+        })))
+        .expect(2)
+        .mount(&mock_server)
+        .await;
+
+    let config = OperonConfig::builder()
+        .client_id("client")
+        .client_secret("secret")
+        .token_url(token_url)
+        .build()
+        .unwrap();
+
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .unwrap();
+    let provider = ClientCredentialsTokenProvider::new(config, client);
+
+    let _ = provider.token().await.unwrap();
+    let _ = provider.force_refresh().await.unwrap();
+
+    let requests = mock_server.received_requests().await.unwrap();
+    let hits = requests
+        .iter()
+        .filter(|req| req.url.path() == "/oauth/token")
+        .count();
+    assert!(hits >= 2);
+}
