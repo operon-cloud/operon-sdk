@@ -127,6 +127,28 @@ class ClientCredentialsManagerTest {
     }
 
     @Test
+    void forceRefreshBypassesCache() throws Exception {
+        registerTokenHandler("/oauth2/token", false, 120);
+
+        ClientCredentialsManager manager = new ClientCredentialsManager(
+            HttpClient.newHttpClient(),
+            baseUri.resolve("/oauth2/token").toString(),
+            "client",
+            "secret",
+            null,
+            null,
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(10)
+        );
+
+        Token first = manager.token();
+        Token refreshed = manager.forceRefresh();
+
+        assertNotEquals(first.getAccessToken(), refreshed.getAccessToken());
+        assertEquals(2, tokenRequestCount.get());
+    }
+
+    @Test
     void surfacesApiErrorsFromTokenEndpoint() throws Exception {
         server.createContext("/oauth2/token", exchange -> {
             tokenRequestCount.incrementAndGet();
@@ -214,6 +236,7 @@ class ClientCredentialsManagerTest {
             claims.put("member_id", "member-1");
             claims.put("session_id", "session-1");
             claims.put("org_id", "org-1");
+            claims.put("token_call", tokenRequestCount.get());
 
             String tokenValue = buildToken(claims);
 

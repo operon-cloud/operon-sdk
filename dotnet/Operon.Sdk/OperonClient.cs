@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -36,6 +37,11 @@ public sealed class OperonClient : IAsyncDisposable
 
     private AccessToken? _cachedToken;
     private bool _disposed;
+    private readonly TimeSpan _heartbeatInterval;
+    private readonly TimeSpan _heartbeatTimeout;
+    private readonly Uri? _heartbeatUri;
+    private CancellationTokenSource? _heartbeatCts;
+    private Task? _heartbeatTask;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OperonClient"/> class.
@@ -48,6 +54,9 @@ public sealed class OperonClient : IAsyncDisposable
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _httpClient = httpClient ?? CreateHttpClient(config);
         _tokenProvider = tokenProvider ?? new ClientCredentialsTokenProvider(config, _httpClient);
+        _heartbeatInterval = config.SessionHeartbeatInterval;
+        _heartbeatTimeout = config.SessionHeartbeatTimeout;
+        _heartbeatUri = config.SessionHeartbeatUri;
     }
 
     /// <summary>
@@ -58,6 +67,7 @@ public sealed class OperonClient : IAsyncDisposable
     public async Task InitAsync(CancellationToken cancellationToken = default)
     {
         _cachedToken = await _tokenProvider.GetTokenAsync(cancellationToken).ConfigureAwait(false);
+        StartHeartbeat();
     }
 
     /// <summary>
@@ -170,6 +180,8 @@ public sealed class OperonClient : IAsyncDisposable
             return;
         }
 
+        await StopHeartbeatAsync().ConfigureAwait(false);
+
         if (_tokenProvider is IDisposable disposableProvider)
         {
             disposableProvider.Dispose();
@@ -178,6 +190,89 @@ public sealed class OperonClient : IAsyncDisposable
         _httpClient.Dispose();
         _disposed = true;
         await Task.CompletedTask;
+    }
+
+    private async Task StopHeartbeatAsync()
+    {
+        if (_heartbeatTask is null || _heartbeatCts is null)
+        {
+            return;
+        }
+
+        _heartbeatCts.Cancel();
+        try
+        {
+            await _heartbeatTask.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown.
+        }
+        finally
+        {
+            _heartbeatCts.Dispose();
+            _heartbeatTask = null;
+            _heartbeatCts = null;
+        }
+    }
+
+    private void StartHeartbeat()
+    {
+        if (_heartbeatUri is null || _heartbeatInterval <= TimeSpan.Zero || _heartbeatTask != null)
+        {
+            return;
+        }
+
+        _heartbeatCts = new CancellationTokenSource();
+        _heartbeatTask = Task.Run(() => HeartbeatLoopAsync(_heartbeatCts.Token));
+    }
+
+    private async Task HeartbeatLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await PerformHeartbeatAsync(cancellationToken).ConfigureAwait(false);
+                await Task.Delay(_heartbeatInterval, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // shutdown
+        }
+    }
+
+    private async Task PerformHeartbeatAsync(CancellationToken cancellationToken)
+    {
+        if (_heartbeatUri is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var token = _cachedToken ?? await _tokenProvider.GetTokenAsync(cancellationToken).ConfigureAwait(false);
+            using var request = new HttpRequestMessage(HttpMethod.Get, _heartbeatUri);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
+
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            linkedCts.CancelAfter(_heartbeatTimeout);
+
+            using var response = await _httpClient.SendAsync(request, linkedCts.Token).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _cachedToken = await _tokenProvider.ForceRefreshAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Swallow cancellations (shutdown or timeout).
+        }
+        catch
+        {
+            // Ignore transient heartbeat failures; next iteration will retry.
+        }
     }
 
     private static HttpClient CreateHttpClient(OperonConfig config)

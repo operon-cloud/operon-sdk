@@ -30,6 +30,9 @@ public sealed class OperonConfig
     /// <param name="httpTimeout">Optional HTTP timeout for outbound calls.</param>
     /// <param name="tokenLeeway">Time window before expiry to refresh cached tokens.</param>
     /// <param name="disableSelfSign">When true, disables automatic request signing.</param>
+    /// <param name="sessionHeartbeatInterval">Optional interval for the session heartbeat loop.</param>
+    /// <param name="sessionHeartbeatTimeout">Optional timeout applied to heartbeat invocations.</param>
+    /// <param name="sessionHeartbeatUri">Optional override for the heartbeat endpoint.</param>
     public OperonConfig(
         string clientId,
         string clientSecret,
@@ -39,7 +42,10 @@ public sealed class OperonConfig
         IEnumerable<string>? audience = null,
         TimeSpan? httpTimeout = null,
         TimeSpan? tokenLeeway = null,
-        bool disableSelfSign = false)
+        bool disableSelfSign = false,
+        TimeSpan? sessionHeartbeatInterval = null,
+        TimeSpan? sessionHeartbeatTimeout = null,
+        Uri? sessionHeartbeatUri = null)
     {
         ClientId = string.IsNullOrWhiteSpace(clientId)
             ? throw new ArgumentException("Client ID is required", nameof(clientId))
@@ -55,6 +61,11 @@ public sealed class OperonConfig
         HttpTimeout = httpTimeout is { } timeout && timeout > TimeSpan.Zero ? timeout : TimeSpan.FromSeconds(30);
         TokenLeeway = tokenLeeway is { } leeway && leeway > TimeSpan.Zero ? leeway : TimeSpan.FromSeconds(30);
         DisableSelfSign = disableSelfSign;
+        SessionHeartbeatInterval = sessionHeartbeatInterval is { } interval && interval > TimeSpan.Zero ? interval : TimeSpan.Zero;
+        SessionHeartbeatTimeout = sessionHeartbeatTimeout is { } heartbeatTimeout && heartbeatTimeout > TimeSpan.Zero ? heartbeatTimeout : TimeSpan.FromSeconds(10);
+        SessionHeartbeatUri = SessionHeartbeatInterval > TimeSpan.Zero
+            ? (sessionHeartbeatUri ?? new Uri(BaseUri, "v1/session/heartbeat"))
+            : null;
     }
 
     /// <summary>Primary API base URL, ending with a slash.</summary>
@@ -83,6 +94,15 @@ public sealed class OperonConfig
 
     /// <summary>When true, callers must provide signatures manually (no self-sign API usage).</summary>
     public bool DisableSelfSign { get; }
+
+    /// <summary>Interval for the optional session heartbeat loop (zero to disable).</summary>
+    public TimeSpan SessionHeartbeatInterval { get; }
+
+    /// <summary>Timeout applied to each heartbeat call.</summary>
+    public TimeSpan SessionHeartbeatTimeout { get; }
+
+    /// <summary>Absolute URI for the heartbeat endpoint, or null when disabled.</summary>
+    public Uri? SessionHeartbeatUri { get; }
 
     private static IEnumerable<string> TrimAudience(IEnumerable<string> audience)
     {

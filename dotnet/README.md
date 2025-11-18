@@ -42,7 +42,7 @@ Add the package to your application (once published to NuGet):
 
 ```xml
 <ItemGroup>
-  <PackageReference Include="Operon.Sdk" Version="1.0.1" />
+  <PackageReference Include="Operon.Sdk" Version="1.0.2" />
 </ItemGroup>
 ```
 
@@ -71,6 +71,18 @@ Console.WriteLine($"Transaction {response.Id} status={response.Status}");
 
 > **Security note**
 > The .NET SDK mirrors the Go implementation: it hashes payload bytes locally and only transmits the hash (`payloadHash`) to Operon. Raw payloads stay within your application boundary.
+
+### Keep sessions warm
+
+Set `sessionHeartbeatInterval` on `OperonConfig` to enable a background heartbeat that pings `/v1/session/heartbeat` and forces a token refresh whenever Operon returns 401:
+
+```csharp
+var config = new OperonConfig(
+    clientId: "...",
+    clientSecret: "...",
+    sessionHeartbeatInterval: TimeSpan.FromMinutes(2)
+);
+```
 
 ## Versioning & Packaging
 

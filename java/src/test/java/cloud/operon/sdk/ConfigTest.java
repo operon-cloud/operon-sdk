@@ -21,6 +21,9 @@ class ConfigTest {
         assertEquals(Config.DEFAULT_TOKEN_LEEWAY, config.getTokenLeeway());
         assertEquals(Config.DEFAULT_SIGNING_ALGORITHM, config.getSigningAlgorithm());
         assertNotNull(config.getHttpClient());
+        assertEquals(Duration.ZERO, config.getSessionHeartbeatInterval());
+        assertEquals(Duration.ofSeconds(10), config.getSessionHeartbeatTimeout());
+        assertNull(config.getSessionHeartbeatUrl());
     }
 
     @Test
@@ -41,9 +44,15 @@ class ConfigTest {
             .clientSecret("secret")
             .httpTimeout(Duration.ofSeconds(5))
             .tokenLeeway(Duration.ofSeconds(10))
+            .sessionHeartbeatInterval(Duration.ofSeconds(60))
+            .sessionHeartbeatTimeout(Duration.ofSeconds(5))
+            .sessionHeartbeatUrl("https://internal.dev.operon.cloud/custom/heartbeat")
             .build();
 
         assertEquals(Duration.ofSeconds(5), config.getHttpTimeout());
         assertEquals(Duration.ofSeconds(10), config.getTokenLeeway());
+        assertEquals(Duration.ofSeconds(60), config.getSessionHeartbeatInterval());
+        assertEquals(Duration.ofSeconds(5), config.getSessionHeartbeatTimeout());
+        assertEquals("https://internal.dev.operon.cloud/custom/heartbeat", config.getSessionHeartbeatUrl());
     }
 }

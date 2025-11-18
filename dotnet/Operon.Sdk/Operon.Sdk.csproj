@@ -6,7 +6,7 @@
     <LangVersion>12.0</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <WarningsAsErrors>CS8600;CS8602;CS8618</WarningsAsErrors>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Net.Http.Json" Version="8.0.0" />

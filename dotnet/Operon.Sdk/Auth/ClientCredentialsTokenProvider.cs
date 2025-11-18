@@ -30,6 +30,11 @@ public interface ITokenProvider
     /// Clears any cached token, forcing the next request to fetch a fresh one.
     /// </summary>
     void Clear();
+
+    /// <summary>
+    /// Forces issuance of a fresh token immediately, replacing the cached token.
+    /// </summary>
+    Task<AccessToken> ForceRefreshAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -66,6 +71,10 @@ public sealed class ClientCredentialsTokenProvider : ITokenProvider
 
     /// <inheritdoc />
     public void Clear() => _cachedToken = null;
+
+    /// <inheritdoc />
+    public Task<AccessToken> ForceRefreshAsync(CancellationToken cancellationToken) =>
+        FetchFreshTokenAsync(cancellationToken);
 
     private async Task<AccessToken> FetchFreshTokenAsync(CancellationToken cancellationToken)
     {

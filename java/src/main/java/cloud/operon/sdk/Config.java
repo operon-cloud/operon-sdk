@@ -36,6 +36,7 @@ public final class Config {
     public static final Duration DEFAULT_TOKEN_LEEWAY = Duration.ofSeconds(30);
     public static final String DEFAULT_SIGNING_ALGORITHM = "EdDSA";
     static final String DEFAULT_KEY_ID_SUFFIX = "#keys-1";
+    private static final Duration DEFAULT_HEARTBEAT_TIMEOUT = Duration.ofSeconds(10);
 
     private final String baseUrl;
     private final String tokenUrl;
@@ -48,6 +49,9 @@ public final class Config {
     private final Duration tokenLeeway;
     private final boolean disableSelfSign;
     private final String signingAlgorithm;
+    private final Duration sessionHeartbeatInterval;
+    private final Duration sessionHeartbeatTimeout;
+    private final String sessionHeartbeatUrl;
 
     private Config(Builder builder) {
         this.baseUrl = builder.baseUrl;
@@ -61,6 +65,9 @@ public final class Config {
         this.tokenLeeway = builder.tokenLeeway;
         this.disableSelfSign = builder.disableSelfSign;
         this.signingAlgorithm = builder.signingAlgorithm;
+        this.sessionHeartbeatInterval = builder.sessionHeartbeatInterval;
+        this.sessionHeartbeatTimeout = builder.sessionHeartbeatTimeout;
+        this.sessionHeartbeatUrl = builder.sessionHeartbeatUrl;
     }
 
     /**
@@ -118,6 +125,21 @@ public final class Config {
                 .build();
         }
 
+        Duration resolvedHeartbeatInterval = Optional.ofNullable(sessionHeartbeatInterval).orElse(Duration.ZERO);
+        if (resolvedHeartbeatInterval.isNegative()) {
+            resolvedHeartbeatInterval = Duration.ZERO;
+        }
+
+        Duration resolvedHeartbeatTimeout = Optional.ofNullable(sessionHeartbeatTimeout).orElse(DEFAULT_HEARTBEAT_TIMEOUT);
+        if (resolvedHeartbeatTimeout.isNegative() || resolvedHeartbeatTimeout.isZero()) {
+            resolvedHeartbeatTimeout = DEFAULT_HEARTBEAT_TIMEOUT;
+        }
+
+        String resolvedHeartbeatUrl = null;
+        if (!resolvedHeartbeatInterval.isZero()) {
+            resolvedHeartbeatUrl = resolveHeartbeatUrl(Optional.ofNullable(sessionHeartbeatUrl).orElse(""), resolvedBaseUrl);
+        }
+
         return new Builder()
             .baseUrl(resolvedBaseUrl)
             .tokenUrl(resolvedTokenUrl)
@@ -130,6 +152,9 @@ public final class Config {
             .tokenLeeway(resolvedLeeway)
             .disableSelfSign(disableSelfSign)
             .signingAlgorithm(algorithm)
+            .sessionHeartbeatInterval(resolvedHeartbeatInterval)
+            .sessionHeartbeatTimeout(resolvedHeartbeatTimeout)
+            .sessionHeartbeatUrl(resolvedHeartbeatUrl)
             .buildInternal();
     }
 
@@ -153,6 +178,14 @@ public final class Config {
             return trimmed.substring(0, trimmed.length() - 1);
         }
         return trimmed;
+    }
+
+    private static String resolveHeartbeatUrl(String customUrl, String baseUrl) {
+        String trimmed = Optional.ofNullable(customUrl).map(String::trim).orElse("");
+        if (!trimmed.isEmpty()) {
+            return sanitizeUrl(trimmed);
+        }
+        return baseUrl + "/v1/session/heartbeat";
     }
 
     public String getBaseUrl() {
@@ -199,6 +232,18 @@ public final class Config {
         return signingAlgorithm;
     }
 
+    public Duration getSessionHeartbeatInterval() {
+        return sessionHeartbeatInterval;
+    }
+
+    public Duration getSessionHeartbeatTimeout() {
+        return sessionHeartbeatTimeout;
+    }
+
+    public String getSessionHeartbeatUrl() {
+        return sessionHeartbeatUrl;
+    }
+
     public static final class Builder {
         private String baseUrl;
         private String tokenUrl;
@@ -211,6 +256,9 @@ public final class Config {
         private Duration tokenLeeway;
         private boolean disableSelfSign;
         private String signingAlgorithm;
+        private Duration sessionHeartbeatInterval;
+        private Duration sessionHeartbeatTimeout;
+        private String sessionHeartbeatUrl;
 
         /**
          * Sets the Client API base URL. Leave unset to target {@link #DEFAULT_BASE_URL}. Accepts values with or without a trailing slash.
@@ -300,6 +348,31 @@ public final class Config {
          */
         public Builder signingAlgorithm(String signingAlgorithm) {
             this.signingAlgorithm = signingAlgorithm;
+            return this;
+        }
+
+        /**
+         * Enables the optional session heartbeat loop. Provide a positive duration representing how often the SDK
+         * should ping the Client API. Use {@link #sessionHeartbeatUrl(String)} to override the endpoint.
+         */
+        public Builder sessionHeartbeatInterval(Duration sessionHeartbeatInterval) {
+            this.sessionHeartbeatInterval = sessionHeartbeatInterval;
+            return this;
+        }
+
+        /**
+         * Overrides the timeout applied to each heartbeat request.
+         */
+        public Builder sessionHeartbeatTimeout(Duration sessionHeartbeatTimeout) {
+            this.sessionHeartbeatTimeout = sessionHeartbeatTimeout;
+            return this;
+        }
+
+        /**
+         * Customises the heartbeat endpoint. When unset the SDK targets {@code {baseUrl}/v1/session/heartbeat}.
+         */
+        public Builder sessionHeartbeatUrl(String sessionHeartbeatUrl) {
+            this.sessionHeartbeatUrl = sessionHeartbeatUrl;
             return this;
         }
 

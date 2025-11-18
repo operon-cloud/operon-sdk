@@ -18,6 +18,9 @@ public sealed class ConfigTests
         Assert.False(config.DisableSelfSign);
         Assert.Empty(config.Audience);
         Assert.Null(config.Scope);
+        Assert.Equal(TimeSpan.Zero, config.SessionHeartbeatInterval);
+        Assert.Equal(TimeSpan.FromSeconds(10), config.SessionHeartbeatTimeout);
+        Assert.Null(config.SessionHeartbeatUri);
     }
 
     [Fact]
@@ -36,7 +39,10 @@ public sealed class ConfigTests
             scope: " transactions:write ",
             audience: new[] { " https://example.com " },
             httpTimeout: TimeSpan.FromSeconds(10),
-            tokenLeeway: TimeSpan.FromSeconds(5)
+            tokenLeeway: TimeSpan.FromSeconds(5),
+            sessionHeartbeatInterval: TimeSpan.FromSeconds(60),
+            sessionHeartbeatTimeout: TimeSpan.FromSeconds(5),
+            sessionHeartbeatUri: new Uri("https://internal.example.com/custom-heartbeat")
         );
 
         Assert.Equal("transactions:write", config.Scope);
@@ -44,5 +50,8 @@ public sealed class ConfigTests
         Assert.Equal("https://example.com", config.Audience[0]);
         Assert.Equal(TimeSpan.FromSeconds(10), config.HttpTimeout);
         Assert.Equal(TimeSpan.FromSeconds(5), config.TokenLeeway);
+        Assert.Equal(TimeSpan.FromSeconds(60), config.SessionHeartbeatInterval);
+        Assert.Equal(TimeSpan.FromSeconds(5), config.SessionHeartbeatTimeout);
+        Assert.Equal(new Uri("https://internal.example.com/custom-heartbeat"), config.SessionHeartbeatUri);
     }
 }

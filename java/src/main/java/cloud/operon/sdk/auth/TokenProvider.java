@@ -12,4 +12,9 @@ public interface TokenProvider {
     default void invalidate() {
         // default no-op
     }
+
+    default Token forceRefresh() throws OperonException {
+        invalidate();
+        return token();
+    }
 }

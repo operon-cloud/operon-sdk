@@ -16,10 +16,13 @@ import cloud.operon.sdk.signing.Signer;
 import cloud.operon.sdk.signing.SigningResult;
 
 import java.io.IOException;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -30,6 +33,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -62,6 +69,9 @@ public final class OperonClient implements AutoCloseable {
     private final Signer signer;
     private final boolean selfSigning;
     private final Registry registry = new Registry();
+    private final Duration heartbeatInterval;
+    private final Duration heartbeatTimeout;
+    private final String heartbeatUrl;
 
     private final Object initLock = new Object();
     private boolean initAttempted;
@@ -83,6 +93,8 @@ public final class OperonClient implements AutoCloseable {
     private String cachedMemberId;
     private String cachedSessionId;
     private String cachedOrgId;
+    private final Object heartbeatLock = new Object();
+    private ScheduledExecutorService heartbeatExecutor;
 
     /**
      * Constructs a new Operon client using the supplied configuration.
@@ -113,6 +125,9 @@ public final class OperonClient implements AutoCloseable {
             this.signer = new SelfSigner(this.httpClient, this.baseUrl);
             this.selfSigning = true;
         }
+        this.heartbeatInterval = this.config.getSessionHeartbeatInterval();
+        this.heartbeatTimeout = this.config.getSessionHeartbeatTimeout();
+        this.heartbeatUrl = this.config.getSessionHeartbeatUrl();
     }
 
     /**
@@ -137,6 +152,7 @@ public final class OperonClient implements AutoCloseable {
             initAttempted = true;
             try {
                 getToken();
+                startHeartbeat();
             } catch (OperonException ex) {
                 initFailure = ex;
                 throw ex;
@@ -309,6 +325,7 @@ public final class OperonClient implements AutoCloseable {
      */
     @Override
     public void close() {
+        stopHeartbeat();
         // httpClient is managed externally; nothing to close.
     }
 
@@ -576,6 +593,64 @@ public final class OperonClient implements AutoCloseable {
             .filter(s -> !s.isEmpty())
             .distinct()
             .collect(Collectors.toList());
+    }
+
+    private void startHeartbeat() {
+        if (heartbeatUrl == null || heartbeatInterval == null || heartbeatInterval.isZero() || heartbeatInterval.isNegative()) {
+            return;
+        }
+        synchronized (heartbeatLock) {
+            if (heartbeatExecutor != null) {
+                return;
+            }
+            heartbeatExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "operon-sdk-heartbeat");
+                t.setDaemon(true);
+                return t;
+            });
+            long intervalMillis = Math.max(heartbeatInterval.toMillis(), 1L);
+            heartbeatExecutor.scheduleAtFixedRate(this::runHeartbeatSafely, 0, intervalMillis, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    private void stopHeartbeat() {
+        synchronized (heartbeatLock) {
+            if (heartbeatExecutor != null) {
+                heartbeatExecutor.shutdownNow();
+                heartbeatExecutor = null;
+            }
+        }
+    }
+
+    private void runHeartbeatSafely() {
+        try {
+            performHeartbeat();
+        } catch (Exception ex) {
+            LOGGER.log(Level.WARNING, "[operon-sdk] session heartbeat error", ex);
+        }
+    }
+
+    private void performHeartbeat() throws OperonException, IOException, InterruptedException {
+        if (heartbeatUrl == null) {
+            return;
+        }
+
+        Token token = tokenProvider.token();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(heartbeatUrl))
+            .header("Authorization", "Bearer " + token.getAccessToken())
+            .timeout(heartbeatTimeout)
+            .GET()
+            .build();
+
+        HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+        int status = response.statusCode();
+        if (status == 401) {
+            LOGGER.warning("[operon-sdk] session heartbeat returned 401; forcing token refresh");
+            tokenProvider.forceRefresh();
+        } else if (status >= 400) {
+            LOGGER.warning(() -> "[operon-sdk] session heartbeat unexpected status " + status);
+        }
     }
 
     private static String optionalTrim(String value) {

@@ -91,6 +91,18 @@ public final class ClientCredentialsManager implements TokenProvider {
         cached = null;
     }
 
+    @Override
+    public Token forceRefresh() throws OperonException {
+        lock.lock();
+        try {
+            Token fresh = fetchToken();
+            cached = fresh;
+            return fresh;
+        } finally {
+            lock.unlock();
+        }
+    }
+
     private boolean isFresh(Token token) {
         Instant refreshAt = token.getExpiry().minus(leeway);
         return Instant.now().isBefore(refreshAt);

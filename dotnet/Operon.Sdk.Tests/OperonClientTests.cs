@@ -172,6 +172,65 @@ public sealed class OperonClientTests
         Assert.Equal("manual", result.Signature.Value);
     }
 
+    [Fact]
+    public async Task HeartbeatForcesTokenRefreshOnUnauthorized()
+    {
+        var config = new OperonConfig(
+            "client",
+            "secret",
+            sessionHeartbeatInterval: TimeSpan.FromMilliseconds(50),
+            sessionHeartbeatTimeout: TimeSpan.FromMilliseconds(100));
+
+        var handler = new StubHttpMessageHandler();
+        handler.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        for (var i = 0; i < 5; i++)
+        {
+            handler.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        }
+
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = config.BaseUri,
+            Timeout = config.HttpTimeout
+        };
+
+        var tokenProvider = new StubTokenProvider();
+        await using var client = new OperonClient(config, httpClient, tokenProvider);
+        await client.InitAsync();
+        await Task.Delay(200);
+
+        Assert.True(tokenProvider.ForceRefreshCount >= 1);
+    }
+
+    private sealed class StubTokenProvider : ITokenProvider
+    {
+        private AccessToken _token = new()
+        {
+            Value = "stub-token",
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
+        };
+
+        public int ForceRefreshCount { get; private set; }
+
+        public Task<AccessToken> GetTokenAsync(CancellationToken cancellationToken)
+            => Task.FromResult(_token);
+
+        public void Clear()
+        {
+        }
+
+        public Task<AccessToken> ForceRefreshAsync(CancellationToken cancellationToken)
+        {
+            ForceRefreshCount++;
+            _token = new AccessToken
+            {
+                Value = $"refreshed-{ForceRefreshCount}",
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
+            };
+            return Task.FromResult(_token);
+        }
+    }
+
     private static string BuildToken(object claims)
     {
         var header = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(new { alg = "HS256", typ = "JWT" })).Trim('=').Replace('+', '-').Replace('/', '_');

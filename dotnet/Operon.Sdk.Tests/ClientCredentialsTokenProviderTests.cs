@@ -64,6 +64,26 @@ public sealed class ClientCredentialsTokenProviderTests
         Assert.NotEqual(first.Value, second.Value);
     }
 
+    [Fact]
+    public async Task ForceRefreshBypassesCache()
+    {
+        var config = new OperonConfig("client", "secret");
+        var handler = new StubHttpMessageHandler();
+        handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new { access_token = BuildToken(new { nonce = "force-1" }), expires_in = 300 }));
+        handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new { access_token = BuildToken(new { nonce = "force-2" }), expires_in = 300 }));
+
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = config.TokenUri
+        };
+
+        var provider = new ClientCredentialsTokenProvider(config, httpClient);
+        var first = await provider.GetTokenAsync(CancellationToken.None);
+        var second = await provider.ForceRefreshAsync(CancellationToken.None);
+
+        Assert.NotEqual(first.Value, second.Value);
+    }
+
     private static string BuildToken(object claims)
     {
         var header = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(new { alg = "HS256", typ = "JWT" })).Trim('=').Replace('+', '-').Replace('/', '_');
