@@ -95,6 +95,8 @@ export class OperonClient {
 
   private participantDid?: string;
   private channelId?: string;
+  private heartbeatTimer?: ReturnType<typeof setInterval>;
+  private heartbeatRunning = false;
 
   /**
    * Constructs a new client; accepts either raw input or a pre-normalised config.
@@ -120,12 +122,14 @@ export class OperonClient {
    */
   async init(signal?: AbortSignal): Promise<void> {
     await this.tokenValue(signal);
+    this.startHeartbeat();
   }
 
   /**
    * Clears cached credentials; currently a no-op beyond token eviction.
    */
   async close(): Promise<void> {
+    this.stopHeartbeat();
     this.tokens.clear();
   }
 
@@ -264,6 +268,81 @@ export class OperonClient {
       this.channelId = token.channelId;
     }
     return token;
+  }
+
+  private startHeartbeat(): void {
+    if (
+      this.config.sessionHeartbeatIntervalMs <= 0 ||
+      !this.config.sessionHeartbeatUrl ||
+      this.heartbeatTimer
+    ) {
+      return;
+    }
+
+    const run = () => {
+      if (this.heartbeatRunning) {
+        return;
+      }
+      this.heartbeatRunning = true;
+      this.performHeartbeat()
+        .catch((error) => {
+          this.config.logger.warn?.('session heartbeat failed', { error });
+        })
+        .finally(() => {
+          this.heartbeatRunning = false;
+        });
+    };
+
+    run();
+    this.heartbeatTimer = setInterval(run, this.config.sessionHeartbeatIntervalMs);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = undefined;
+    }
+    this.heartbeatRunning = false;
+  }
+
+  private async performHeartbeat(): Promise<void> {
+    if (!this.config.sessionHeartbeatUrl) {
+      return;
+    }
+
+    const token = await this.tokens.token();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.config.sessionHeartbeatTimeoutMs);
+
+    try {
+      const response = await this.config.fetchImpl(this.config.sessionHeartbeatUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token.accessToken}`
+        },
+        signal: controller.signal
+      });
+
+      if (response.status === 401) {
+        this.config.logger.warn?.('session heartbeat unauthorized; forcing token refresh');
+        await this.tokens.forceRefresh();
+        return;
+      }
+
+      if (response.status >= 400) {
+        this.config.logger.warn?.('session heartbeat returned unexpected status', {
+          status: response.status
+        });
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        this.config.logger.warn?.('session heartbeat timed out');
+      } else {
+        this.config.logger.warn?.('session heartbeat error', { error });
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private async populateInteractionFields(

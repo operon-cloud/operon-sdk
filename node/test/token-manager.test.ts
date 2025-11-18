@@ -86,4 +86,37 @@ describe('ClientCredentialsManager', () => {
     expect(first.accessToken).not.toBe(second.accessToken);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
+
+  test('forceRefresh bypasses cache', async () => {
+    let counter = 0;
+    const fetchImpl = vi.fn(async () => {
+      counter += 1;
+      return new Response(
+        JSON.stringify({
+          access_token: `header.payload.${counter}`,
+          token_type: 'Bearer',
+          expires_in: 3600
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    });
+
+    const manager = new ClientCredentialsManager(
+      createConfig({
+        clientId: 'client',
+        clientSecret: 'secret',
+        tokenUrl: TOKEN_URL,
+        fetchImpl
+      })
+    );
+
+    const first = await manager.token();
+    const forced = await manager.forceRefresh();
+
+    expect(first.accessToken).not.toBe(forced.accessToken);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
 });

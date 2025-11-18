@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   DEFAULT_BASE_URL,
+  DEFAULT_HEARTBEAT_TIMEOUT_MS,
   DEFAULT_HTTP_TIMEOUT_MS,
   DEFAULT_TOKEN_LEEWAY_MS,
   DEFAULT_TOKEN_URL,
@@ -24,6 +25,9 @@ describe('createConfig', () => {
     expect(config.disableSelfSign).toBe(false);
     expect(typeof config.fetchImpl).toBe('function');
     expect(config.logger).toBeDefined();
+    expect(config.sessionHeartbeatIntervalMs).toBe(0);
+    expect(config.sessionHeartbeatTimeoutMs).toBe(DEFAULT_HEARTBEAT_TIMEOUT_MS);
+    expect(config.sessionHeartbeatUrl).toBeUndefined();
   });
 
   test('trims URLs and applies overrides', () => {
@@ -39,7 +43,10 @@ describe('createConfig', () => {
       signingAlgorithm: 'ES256',
       disableSelfSign: true,
       tokenLeewayMs: 5_000,
-      fetchImpl
+      fetchImpl,
+      sessionHeartbeatIntervalMs: 30_000,
+      sessionHeartbeatTimeoutMs: 5_000,
+      sessionHeartbeatUrl: ' https://internal.example/heartbeat/ '
     });
 
     expect(config.baseUrl).toBe('https://example.com/client-api');
@@ -51,10 +58,25 @@ describe('createConfig', () => {
     expect(config.disableSelfSign).toBe(true);
     expect(config.tokenLeewayMs).toBe(5_000);
     expect(config.fetchImpl).toBe(fetchImpl);
+    expect(config.sessionHeartbeatIntervalMs).toBe(30_000);
+    expect(config.sessionHeartbeatTimeoutMs).toBe(5_000);
+    expect(config.sessionHeartbeatUrl).toBe('https://internal.example/heartbeat');
   });
 
   test('requires client credentials', () => {
     expect(() => createConfig({ clientId: '', clientSecret: '' })).toThrow('clientId is required');
     expect(() => createConfig({ clientId: 'id', clientSecret: '' })).toThrow('clientSecret is required');
+  });
+
+  test('derives heartbeat URL from base when enabled', () => {
+    const config = createConfig({
+      clientId: 'client',
+      clientSecret: 'secret',
+      baseUrl: 'https://example/base',
+      sessionHeartbeatIntervalMs: 1_000
+    });
+
+    expect(config.sessionHeartbeatUrl).toBe('https://example/base/v1/session/heartbeat');
+    expect(config.sessionHeartbeatTimeoutMs).toBe(DEFAULT_HEARTBEAT_TIMEOUT_MS);
   });
 });

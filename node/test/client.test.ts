@@ -248,4 +248,58 @@ describe('OperonClient', () => {
     expect(result.signature.value).toBe('manual');
     expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
+
+  test('heartbeat forces token refresh when unauthorized', async () => {
+    const heartbeatUrl = `${BASE_URL}/v1/session/heartbeat`;
+    let tokenCounter = 0;
+    let heartbeatCalls = 0;
+
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url === TOKEN_URL) {
+        tokenCounter += 1;
+        return buildResponse({
+          access_token: `header.${Buffer.from(JSON.stringify({})).toString('base64url')}.${tokenCounter}`,
+          token_type: 'Bearer',
+          expires_in: 60
+        });
+      }
+
+      if (url === heartbeatUrl) {
+        heartbeatCalls += 1;
+        const status = heartbeatCalls === 1 ? 401 : 200;
+        return new Response('{}', { status, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      return buildResponse({});
+    });
+
+    const client = new OperonClient(
+      createConfig({
+        baseUrl: BASE_URL,
+        tokenUrl: TOKEN_URL,
+        clientId: 'client',
+        clientSecret: 'secret',
+        fetchImpl,
+        sessionHeartbeatIntervalMs: 25,
+        sessionHeartbeatTimeoutMs: 200
+      })
+    );
+
+    await client.init();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    await client.close();
+
+    expect(fetchImpl).toHaveBeenCalled();
+    const heartbeatHits = fetchImpl.mock.calls.filter(
+      ([input]) => (typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url) === heartbeatUrl
+    );
+    expect(heartbeatHits.length).toBeGreaterThanOrEqual(1);
+    // First PAT during init + forced refresh after 401 heartbeat.
+    const tokenHits = fetchImpl.mock.calls.filter(
+      ([input]) => (typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url) === TOKEN_URL
+    );
+    expect(tokenHits.length).toBeGreaterThanOrEqual(2);
+  });
 });

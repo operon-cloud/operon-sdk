@@ -39,6 +39,22 @@ await client.close();
 > **Security note**
 > The Node.js SDK mirrors the Go client: it computes a SHA-256 hash of any payload you provide and only transmits the hash (`payloadHash`) to Operon. Raw payload bytes stay inside your service boundary.
 
+### Keep sessions warm (optional heartbeat)
+
+Long-running daemons can proactively validate their PAT by enabling the heartbeat poller. When the server reports `401`, the SDK immediately mints a new PAT via your stored client credentials so the next API call succeeds.
+
+```ts
+const client = new OperonClient(createConfig({
+  clientId: process.env.OPERON_CLIENT_ID!,
+  clientSecret: process.env.OPERON_CLIENT_SECRET!,
+  sessionHeartbeatIntervalMs: 120_000, // ping every 2 minutes
+}));
+
+await client.init(); // starts the heartbeat loop
+// ...
+await client.close(); // stops the loop
+```
+
 ### Generate Operon Headers
 
 Need to call a downstream API with Operon-managed signatures? Use `generateSignatureHeaders` to obtain the DID headers without manually constructing payload hashes:

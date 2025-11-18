@@ -18,6 +18,10 @@ export interface TokenManager {
    */
   token(signal?: AbortSignal): Promise<AccessToken>;
   /**
+   * Forces minting of a new token, replacing the cached entry.
+   */
+  forceRefresh(signal?: AbortSignal): Promise<AccessToken>;
+  /**
    * Clears any cached token forcing the next call to mint a fresh one.
    */
   clear(): void;
@@ -39,6 +43,12 @@ export class ClientCredentialsManager implements TokenManager {
       return this.cached;
     }
 
+    const fresh = await this.fetchToken(signal);
+    this.cached = fresh;
+    return fresh;
+  }
+
+  async forceRefresh(signal?: AbortSignal): Promise<AccessToken> {
     const fresh = await this.fetchToken(signal);
     this.cached = fresh;
     return fresh;

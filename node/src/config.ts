@@ -16,6 +16,10 @@ export const DEFAULT_HTTP_TIMEOUT_MS = 30_000;
  * Default buffer applied when refreshing access tokens ahead of expiry.
  */
 export const DEFAULT_TOKEN_LEEWAY_MS = 30_000;
+/**
+ * Default timeout applied to heartbeat requests.
+ */
+export const DEFAULT_HEARTBEAT_TIMEOUT_MS = 10_000;
 
 export interface Logger {
   debug?(message: string, metadata?: Record<string, unknown>): void;
@@ -40,6 +44,9 @@ export interface OperonConfigInput {
   signingAlgorithm?: string;
   tokenLeewayMs?: number;
   logger?: Logger;
+  sessionHeartbeatIntervalMs?: number;
+  sessionHeartbeatTimeoutMs?: number;
+  sessionHeartbeatUrl?: string;
 }
 
 /**
@@ -58,6 +65,9 @@ export interface OperonConfig {
   signingAlgorithm: string;
   tokenLeewayMs: number;
   logger: Logger;
+  sessionHeartbeatIntervalMs: number;
+  sessionHeartbeatTimeoutMs: number;
+  sessionHeartbeatUrl?: string;
 }
 
 const noopLogger: Logger = {
@@ -116,6 +126,19 @@ export function createConfig(input: OperonConfigInput): OperonConfig {
   const scope = input.scope?.trim() || undefined;
   const audience =
     input.audience?.map((aud) => aud.trim()).filter((aud) => aud.length > 0) ?? [];
+  const sessionHeartbeatIntervalMs =
+    input.sessionHeartbeatIntervalMs && input.sessionHeartbeatIntervalMs > 0
+      ? input.sessionHeartbeatIntervalMs
+      : 0;
+  const sessionHeartbeatTimeoutMs =
+    input.sessionHeartbeatTimeoutMs && input.sessionHeartbeatTimeoutMs > 0
+      ? input.sessionHeartbeatTimeoutMs
+      : DEFAULT_HEARTBEAT_TIMEOUT_MS;
+  const sessionHeartbeatUrl = resolveHeartbeatUrl(
+    sessionHeartbeatIntervalMs,
+    input.sessionHeartbeatUrl,
+    baseUrl
+  );
 
   return {
     baseUrl,
@@ -129,6 +152,24 @@ export function createConfig(input: OperonConfigInput): OperonConfig {
     disableSelfSign: Boolean(input.disableSelfSign),
     signingAlgorithm,
     tokenLeewayMs,
-    logger: input.logger ?? noopLogger
+    logger: input.logger ?? noopLogger,
+    sessionHeartbeatIntervalMs,
+    sessionHeartbeatTimeoutMs,
+    sessionHeartbeatUrl
   };
+}
+
+function resolveHeartbeatUrl(
+  intervalMs: number,
+  customUrl: string | undefined,
+  baseUrl: string
+): string | undefined {
+  if (intervalMs <= 0) {
+    return undefined;
+  }
+  const trimmed = customUrl?.trim();
+  if (trimmed) {
+    return trimAndRemoveTrailingSlash(trimmed, trimmed);
+  }
+  return `${baseUrl}/v1/session/heartbeat`;
 }
