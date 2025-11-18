@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -24,6 +25,7 @@ SELF_SIGN_ENDPOINT = "v1/dids/self/sign"
 TRANSACTIONS_ENDPOINT = "v1/transactions"
 CHANNEL_INTERACTIONS_ENDPOINT = "v1/channels/{channel_id}/interactions"
 CHANNEL_PARTICIPANTS_ENDPOINT = "v1/channels/{channel_id}/participants"
+logger = logging.getLogger(__name__)
 
 
 class OperonClient:
@@ -46,13 +48,17 @@ class OperonClient:
         self._participants: Optional[List[ParticipantSummary]] = None
         self._catalog_channel_id: Optional[str] = None
         self._catalog_lock = asyncio.Lock()
+        self._heartbeat_task: Optional[asyncio.Task[None]] = None
+        self._heartbeat_stop: Optional[asyncio.Event] = None
 
     async def init(self) -> None:
         """Eagerly fetch an access token so authentication errors surface quickly."""
         await self._token_provider.get_token()
+        self._start_heartbeat()
 
     async def aclose(self) -> None:
         """Close the underlying HTTP client."""
+        await self._stop_heartbeat()
         await self._client.aclose()
 
     async def __aenter__(self) -> "OperonClient":
@@ -249,6 +255,77 @@ class OperonClient:
         if did and did.strip():
             return f"{did}#keys-1"
         return None
+
+    def _start_heartbeat(self) -> None:
+        if (
+            self._config.session_heartbeat_interval <= 0
+            or not self._config.session_heartbeat_url
+            or self._heartbeat_task
+        ):
+            return
+
+        self._heartbeat_stop = asyncio.Event()
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+
+    async def _stop_heartbeat(self) -> None:
+        task = self._heartbeat_task
+        if not task:
+            return
+        if self._heartbeat_stop:
+            self._heartbeat_stop.set()
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._heartbeat_task = None
+            self._heartbeat_stop = None
+
+    async def _heartbeat_loop(self) -> None:
+        assert self._heartbeat_stop is not None
+        interval = self._config.session_heartbeat_interval
+        try:
+            while not self._heartbeat_stop.is_set():
+                await self._perform_heartbeat()
+                try:
+                    await asyncio.wait_for(self._heartbeat_stop.wait(), timeout=interval)
+                except asyncio.TimeoutError:
+                    continue
+        except asyncio.CancelledError:
+            raise
+
+    async def _perform_heartbeat(self) -> None:
+        url = self._config.session_heartbeat_url
+        if not url:
+            return
+
+        try:
+            token = await self._token_provider.get_token()
+        except OperonError as exc:
+            logger.warning("session heartbeat failed to obtain token", exc_info=exc)
+            return
+
+        try:
+            response = await self._client.get(
+                url,
+                headers={"Authorization": f"Bearer {token.value}"},
+                timeout=self._config.session_heartbeat_timeout,
+            )
+        except httpx.HTTPError as exc:
+            logger.warning("session heartbeat request failed", exc_info=exc)
+            return
+
+        if response.status_code == 401:
+            logger.warning("session heartbeat returned 401; forcing token refresh")
+            try:
+                await self._token_provider.force_refresh()
+            except OperonError as exc:
+                logger.warning("token refresh during heartbeat failed", exc_info=exc)
+            return
+
+        if response.status_code >= 400:
+            logger.warning("session heartbeat unexpected status %s", response.status_code)
 
 
 __all__ = ["OperonClient"]

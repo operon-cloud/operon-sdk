@@ -40,6 +40,23 @@ asyncio.run(main())
 > **Security note**
 > The Python SDK mirrors the Go implementation: it computes a SHA-256 hash of any payload bytes you provide and only transmits the hash (`payloadHash`) to Operon. Raw payloads never leave your application boundary.
 
+### Session keep-alive (optional)
+
+Long-running workers can enable the background heartbeat so the SDK pings `/v1/session/heartbeat` and forces a token refresh if Operon responds with `401`. Set `session_heartbeat_interval` (seconds) when building the config:
+
+```python
+config = OperonConfig(
+    client_id="your-client-id",
+    client_secret="your-client-secret",
+    session_heartbeat_interval=120.0,  # ping every 2 minutes
+)
+
+client = OperonClient(config)
+await client.init()  # starts the heartbeat loop
+...
+await client.aclose()  # stops the loop
+```
+
 ## Development
 
 ```bash

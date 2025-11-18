@@ -64,6 +64,13 @@ class ClientCredentialsTokenProvider:
         async with self._lock:
             self._cached = None
 
+    async def force_refresh(self) -> AccessToken:
+        """Force issuance of a new token, replacing the cached value."""
+        async with self._lock:
+            token = await self._fetch_token()
+            self._cached = token
+            return token
+
     async def _fetch_token(self) -> AccessToken:
         params = self._build_request_params()
         try:

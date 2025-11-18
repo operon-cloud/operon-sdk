@@ -10,6 +10,7 @@ DEFAULT_BASE_URL = "https://api.operon.cloud/client-api/"
 DEFAULT_TOKEN_URL = "https://auth.operon.cloud/oauth2/token"
 DEFAULT_HTTP_TIMEOUT = 30.0
 DEFAULT_TOKEN_LEEWAY = 30.0
+DEFAULT_HEARTBEAT_TIMEOUT = 10.0
 
 
 def _normalise_base(url: str) -> str:
@@ -54,6 +55,9 @@ class OperonConfig:
     http_timeout: float = DEFAULT_HTTP_TIMEOUT
     token_leeway: float = DEFAULT_TOKEN_LEEWAY
     disable_self_sign: bool = False
+    session_heartbeat_interval: float = 0.0
+    session_heartbeat_timeout: float = DEFAULT_HEARTBEAT_TIMEOUT
+    session_heartbeat_url: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not self.client_id.strip():
@@ -70,6 +74,18 @@ class OperonConfig:
             raise ValueError("http_timeout must be > 0")
         if self.token_leeway < 0:
             raise ValueError("token_leeway cannot be negative")
+        if self.session_heartbeat_interval < 0:
+            raise ValueError("session_heartbeat_interval cannot be negative")
+        if self.session_heartbeat_timeout <= 0:
+            raise ValueError("session_heartbeat_timeout must be > 0")
+
+        if self.session_heartbeat_interval > 0:
+            if self.session_heartbeat_url:
+                self.session_heartbeat_url = _normalise_token(self.session_heartbeat_url.strip())
+            else:
+                self.session_heartbeat_url = urljoin(self.base_url, "v1/session/heartbeat")
+        else:
+            self.session_heartbeat_url = None
 
     def api_url(self, path: str) -> str:
         """Resolve an absolute API URL for the provided path."""

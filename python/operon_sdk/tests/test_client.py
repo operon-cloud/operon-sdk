@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 
@@ -166,3 +167,51 @@ async def test_submit_transaction_manual_signature():
         )
         txn = await client.submit_transaction(request)
         assert txn.signature.value == "manual"
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_forces_token_refresh_when_unauthorised():
+    config = OperonConfig(
+        client_id="client",
+        client_secret="secret",
+        base_url="https://example.com/api/",
+        token_url="https://example.com/oauth/token",
+        session_heartbeat_interval=0.05,
+        session_heartbeat_timeout=0.1,
+    )
+
+    client = OperonClient(config)
+
+    with respx.mock(base_url="https://example.com") as mock:
+        token_route = mock.post("/oauth/token")
+        token_route.side_effect = [
+            Response(
+                200,
+                json={
+                    "access_token": build_token({"participant_did": "did:test:heartbeat"}),
+                    "expires_in": 300,
+                },
+            ),
+            Response(
+                200,
+                json={
+                    "access_token": build_token({"participant_did": "did:test:refresh"}),
+                    "expires_in": 300,
+                },
+            ),
+        ]
+        heartbeat_route = mock.get("/api/v1/session/heartbeat")
+
+        async def heartbeat_side_effect(request):
+            if heartbeat_route.call_count == 0:
+                return Response(401, json={"code": "SESSION_EXPIRED"})
+            return Response(200, json={"status": "ok"})
+
+        heartbeat_route.side_effect = heartbeat_side_effect
+
+        await client.init()
+        await asyncio.sleep(0.2)
+        await client.aclose()
+
+    assert token_route.call_count >= 2
+    assert heartbeat_route.call_count >= 1

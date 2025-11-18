@@ -80,3 +80,34 @@ async def test_token_refreshes_when_expiring():
 
     assert token1.value != token2.value
     assert token2.channel_id == "chnl"
+
+
+@pytest.mark.asyncio
+async def test_force_refresh_replaces_cached_token():
+    config = OperonConfig(
+        client_id="client", client_secret="secret", token_url="https://example.com/token"
+    )
+    provider = ClientCredentialsTokenProvider(config)
+    with respx.mock(base_url="https://example.com") as mock:
+        route = mock.post("/token")
+        route.side_effect = [
+            Response(
+                200,
+                json={
+                    "access_token": build_token({"participant_did": "did:one"}),
+                    "expires_in": 300,
+                },
+            ),
+            Response(
+                200,
+                json={
+                    "access_token": build_token({"participant_did": "did:two"}),
+                    "expires_in": 300,
+                },
+            ),
+        ]
+        token1 = await provider.get_token()
+        token2 = await provider.force_refresh()
+
+    assert token1.value != token2.value
+    assert token2.participant_did == "did:two"
