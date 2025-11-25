@@ -29,6 +29,29 @@ expansions can evolve independently:
 - `version`: exposes the SDK semantic version via `version.String()`, which can
   be overridden at build time with Go ldflags for CI-driven releases.
 
+### DID resolver (pat-free)
+
+For simple DID resolution and JWS verification without PAT plumbing:
+
+```go
+import (
+    "context"
+    "github.com/operon-cloud/operon-sdk/go/dids"
+)
+
+doc, err := dids.Resolve(context.Background(), "did:operon:root")
+if err != nil {
+    // handle
+}
+
+// Verify a compact JWS using keys from the DID Document (EdDSA, ES256 supported)
+if err := dids.VerifyJWS(context.Background(), jwsString, doc, ""); err != nil {
+    // handle verification error
+}
+```
+
+Use `dids.WithBaseURL("https://did.dev.operon.cloud")` to point at dev.
+
 This layout keeps the surface area easy to reason about while giving room for
 future features such as retries, tracing, or additional resource clients.
 
