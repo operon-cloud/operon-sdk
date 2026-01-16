@@ -42,16 +42,28 @@ if err := client.Init(ctx); err != nil {
 
 ## 3. Prepare the transaction request
 
+### Minimal submission (recommended starting point)
+
 ```go
 req := operon.TransactionRequest{
     CorrelationID: "ext-123",         // caller-defined idempotency key
-    WorkstreamID:  "wrk-123",
     InteractionID: "interaction-xyz", // binds workstream + participants
-    Label:         "Demo payload",
-    Tags:          []string{"source:demo"},
     Payload:       []byte("... raw payload ..."),
-    Timestamp:     time.Now().UTC(),  // optional; defaults to current UTC time
-    Actor:         operon.InteractionActorHuman,
+    Label:         "Demo payload",    // optional
+    Tags:          []string{"source:demo"},
+}
+```
+
+This is the leanest path: call `client.Init(ctx)` once, pick an interaction ID, and submit your payload.
+
+### Optional analytics metadata
+
+```go
+req := operon.TransactionRequest{
+    CorrelationID: "ext-124",
+    InteractionID: "interaction-xyz",
+    Payload:       []byte("... raw payload ..."),
+    Timestamp:     time.Now().UTC(), // optional; defaults to current UTC time
     State:         "received",
     StateID:       "queue-001",
     StateLabel:    "Intake",
@@ -64,11 +76,11 @@ req := operon.TransactionRequest{
 Key points:
 
 - Provide either `Payload` (bytes) or `PayloadHash` (base64url SHA-256). The SDK calculates the hash locally when `Payload` is supplied and **only** transmits the hash to Operon; raw payload bytes never leave your service.
-- When interaction metadata is cached, the SDK fills `WorkstreamID`, `SourceDID`, and `TargetDID` automatically. Provide them explicitly if you disable cache usage.
+- If you call `client.Init`, the SDK fills `WorkstreamID`, `SourceDID`, and `TargetDID` from the interaction cache. If you skip cache usage, provide them explicitly.
 - `CorrelationID` enforces idempotency. Choose a deterministic value per logical transaction.
-- Use `State`, `StateID`, and `StateLabel` to align with workstream state/queue analytics.
-- Use `ROIClassification` with `ROICost` and `ROITime` to record baseline, increment, or savings value metrics.
-- Use `Actor` when you need to tag transactions with the executing agent (recommended values: `operon.InteractionActorHuman`, `operon.InteractionActorAI`, `operon.InteractionActorHybrid`, `operon.InteractionActorNonAI`).
+- `State`, `StateID`, and `StateLabel` are optional and align with workstream state/queue analytics.
+- `ROIClassification` with `ROICost` and `ROITime` are optional and record baseline, increment, or savings value metrics.
+- `Actor` is defined on the interaction configuration; leave it unset in most cases. Only override it when you intentionally want per-transaction actor changes.
 
 ## 4. Submit the transaction
 

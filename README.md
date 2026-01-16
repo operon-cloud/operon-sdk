@@ -23,7 +23,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 
 The Go package provides direct access to Operon’s transaction APIs, interaction catalog, and signature utilities.
 
-Transactions support workstream analytics metadata such as state/queue labels and ROI classifications so value metrics can be tracked alongside audit records.
+Transactions support optional workstream analytics metadata such as state/queue labels and ROI classifications so value metrics can be tracked alongside audit records.
 
 ### Installation
 
