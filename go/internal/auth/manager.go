@@ -23,7 +23,7 @@ const defaultLeeway = 30 * time.Second
 type Token struct {
 	AccessToken    string
 	ParticipantDID string
-	ChannelID      string
+	WorkstreamID   string
 	CustomerID     string
 	WorkspaceID    string
 	Email          string
@@ -58,14 +58,12 @@ type ClientCredentialsConfig struct {
 // credential tokens via the Operon identity broker.
 type ClientCredentialsManager struct {
 	tokenURL string
-	body     tokenRequest
 	clientID string
 	secret   string
 	scope    string
 	audience []string
 	http     httpx.Doer
 	leeway   time.Duration
-	legacy   bool
 
 	mu     sync.Mutex
 	cached *Token
@@ -93,24 +91,15 @@ func NewClientCredentialsManager(cfg ClientCredentialsConfig) (*ClientCredential
 	}
 
 	tokenURL := strings.TrimRight(cfg.TokenURL, "/")
-	legacy := strings.Contains(tokenURL, "/v1/session/m2m")
 
 	manager := &ClientCredentialsManager{
 		tokenURL: tokenURL,
-		body: tokenRequest{
-			ClientID:     cfg.ClientID,
-			ClientSecret: cfg.ClientSecret,
-			GrantType:    "client_credentials",
-			Scope:        cfg.Scope,
-			Audience:     cfg.Audience,
-		},
 		clientID: cfg.ClientID,
 		secret:   cfg.ClientSecret,
 		scope:    strings.TrimSpace(cfg.Scope),
 		audience: cfg.Audience,
 		http:     cfg.HTTPClient,
 		leeway:   leeway,
-		legacy:   legacy,
 	}
 	return manager, nil
 }
@@ -155,32 +144,24 @@ func (m *ClientCredentialsManager) fetchToken(ctx context.Context) (Token, error
 		err error
 	)
 
-	if m.legacy {
-		req, err = httpx.NewJSONRequest(ctx, http.MethodPost, m.tokenURL, m.body)
-		if err != nil {
-			return Token{}, fmt.Errorf("build token request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-	} else {
-		form := url.Values{}
-		form.Set("grant_type", "client_credentials")
-		if m.scope != "" {
-			form.Set("scope", m.scope)
-		}
-		for _, aud := range m.audience {
-			if trimmed := strings.TrimSpace(aud); trimmed != "" {
-				form.Add("audience", trimmed)
-			}
-		}
-
-		req, err = http.NewRequestWithContext(ctx, http.MethodPost, m.tokenURL, strings.NewReader(form.Encode()))
-		if err != nil {
-			return Token{}, fmt.Errorf("build token request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		credentials := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", m.clientID, m.secret)))
-		req.Header.Set("Authorization", "Basic "+credentials)
+	form := url.Values{}
+	form.Set("grant_type", "client_credentials")
+	if m.scope != "" {
+		form.Set("scope", m.scope)
 	}
+	for _, aud := range m.audience {
+		if trimmed := strings.TrimSpace(aud); trimmed != "" {
+			form.Add("audience", trimmed)
+		}
+	}
+
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, m.tokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return Token{}, fmt.Errorf("build token request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	credentials := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", m.clientID, m.secret)))
+	req.Header.Set("Authorization", "Basic "+credentials)
 
 	resp, err := m.http.Do(req)
 	if err != nil {
@@ -216,7 +197,7 @@ func (m *ClientCredentialsManager) fetchToken(ctx context.Context) (Token, error
 	token := Token{
 		AccessToken:    accessToken,
 		ParticipantDID: claims.ParticipantDID,
-		ChannelID:      claims.ChannelID,
+		WorkstreamID:   claims.WorkstreamID,
 		CustomerID:     claims.CustomerID,
 		WorkspaceID:    claims.WorkspaceID,
 		Email:          claims.Email,
@@ -231,15 +212,6 @@ func (m *ClientCredentialsManager) fetchToken(ctx context.Context) (Token, error
 	return token, nil
 }
 
-// tokenRequest mirrors the JSON payload expected by the identity broker for M2M token issuance.
-type tokenRequest struct {
-	ClientID     string   `json:"client_id"`
-	ClientSecret string   `json:"client_secret"`
-	GrantType    string   `json:"grant_type"`
-	Scope        string   `json:"scope,omitempty"`
-	Audience     []string `json:"audience,omitempty"`
-}
-
 // tokenResponse represents the JSON body returned by the identity broker.
 type tokenResponse struct {
 	AccessToken string `json:"access_token"`
@@ -251,7 +223,7 @@ type tokenResponse struct {
 // Claims captures token fields used across the SDK.
 type Claims struct {
 	ParticipantDID  string   `json:"participant_did"`
-	ChannelID       string   `json:"channel_id"`
+	WorkstreamID    string   `json:"channel_id"`
 	CustomerID      string   `json:"customer_id"`
 	WorkspaceID     string   `json:"workspace_id"`
 	Email           string   `json:"email"`

@@ -54,8 +54,8 @@ func TestValidateSessionSuccess(t *testing.T) {
 	if info.UserID != "user-123" || info.CustomerID != "cust-123" {
 		t.Fatalf("unexpected session info: %#v", info)
 	}
-	if info.ChannelID != "chnl-123" || info.ParticipantDID != "did:operon:demo" {
-		t.Fatalf("expected channel and DID from claims, got %#v", info)
+	if info.WorkstreamID != "chnl-123" || info.ParticipantDID != "did:operon:demo" {
+		t.Fatalf("expected workstream and DID from claims, got %#v", info)
 	}
 	if info.SessionID != "sess-123" || info.ParticipantID != "prtp-123" {
 		t.Fatalf("unexpected session id: %s", info.SessionID)

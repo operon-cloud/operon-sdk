@@ -7,7 +7,7 @@ focuses on four core capabilities:
 1. Obtaining a Platform Access Token (PAT) using client-credentials (M2M).
 2. Submitting transactions through the public Client API and receiving the
    resulting transaction record.
-3. Discovering channel interactions and participants without leaving the SDK.
+3. Discovering workstream interactions and participants without leaving the SDK.
 4. Generating and validating Operon signature headers for outbound and inbound
    API calls (ID.Operon flows).
 
@@ -86,8 +86,8 @@ With an initialised client you can choose the scenario that matches your workloa
 
 - [Submit a transaction to the Client API](../docs/go/transactions.md)
   - Learn how to construct a `TransactionRequest`, leverage interaction discovery, and handle common response codes.
-- [Discover channel interactions and participants](../docs/go/discovery.md)
-  - Load the authenticated channel’s catalogue via the SDK client or call helper functions that operate directly on the PAT you already have.
+- [Discover workstream interactions and participants](../docs/go/discovery.md)
+  - Load the authenticated workstream’s catalogue via the SDK client or call helper functions that operate directly on the PAT you already have.
 - [Sign outgoing API calls](../docs/go/signing.md)
   - Shows how to request managed signatures, assemble the required Operon headers, and attach them to any HTTP request.
 - [Validate incoming API call signatures](../docs/go/validation.md)
@@ -95,6 +95,8 @@ With an initialised client you can choose the scenario that matches your workloa
 - PAT-only helpers: use `SignHashWithPAT` and `SubmitTransactionWithPAT` when you already have a sandbox-issued PAT and want to avoid storing client secrets.
 
 Both guides include full code samples, error-handling tips, and troubleshooting checklists.
+
+`TransactionRequest` also supports workstream analytics fields such as `State`, `StateID`, `StateLabel`, `ROIClassification`, `ROICost`, `ROITime`, and `Actor` to align submissions with value metrics and queue tracking.
 
 ## Session keep-alive & token refresh
 
@@ -135,7 +137,7 @@ go test ./...
 ## Roadmap
 
 - Idiomatic helpers for signing payloads (Ed25519 and ECDSA).
-- Channel + interaction discovery helpers.
+- Workstream + interaction discovery helpers.
 - Richer transaction lifecycle APIs (status polling, history).
 
 Feedback and pull requests are welcome while we shape the public SDK surface.

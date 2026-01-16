@@ -16,6 +16,34 @@ const (
 	AlgorithmES256K  = "ES256K"
 )
 
+// ROIClassification describes how an interaction affects ROI metrics.
+type ROIClassification string
+
+const (
+	ROIClassificationBaseline  ROIClassification = "baseline"
+	ROIClassificationIncrement ROIClassification = "increment"
+	ROIClassificationSavings   ROIClassification = "savings"
+)
+
+// InteractionType describes whether an interaction represents a touch, transition, or transfer event.
+type InteractionType string
+
+const (
+	InteractionTypeTouch      InteractionType = "touch"
+	InteractionTypeTransition InteractionType = "transition"
+	InteractionTypeTransfer   InteractionType = "transfer"
+)
+
+// InteractionActor describes the agent responsible for an interaction.
+type InteractionActor string
+
+const (
+	InteractionActorHuman  InteractionActor = "human"
+	InteractionActorAI     InteractionActor = "ai"
+	InteractionActorHybrid InteractionActor = "hybrid"
+	InteractionActorNonAI  InteractionActor = "non-ai"
+)
+
 // Signature captures the digital signature metadata required by the Operon client API.
 type Signature struct {
 	Algorithm string `json:"algorithm"`
@@ -25,73 +53,109 @@ type Signature struct {
 
 // Transaction mirrors the persisted domain entity returned by TrustOperon services.
 type Transaction struct {
-	ID                    string    `json:"id"`
-	CorrelationID         string    `json:"correlationId"`
-	ChannelID             string    `json:"channelId"`
-	CustomerID            string    `json:"customerId,omitempty"`
-	WorkspaceID           string    `json:"workspaceId,omitempty"`
-	InteractionID         string    `json:"interactionId"`
-	Timestamp             time.Time `json:"timestamp"`
-	SourceDID             string    `json:"sourceDid"`
-	TargetDID             string    `json:"targetDid"`
-	Signature             Signature `json:"signature"`
-	Label                 string    `json:"label,omitempty"`
-	Tags                  []string  `json:"tags,omitempty"`
-	PayloadHash           string    `json:"payloadHash"`
-	Status                string    `json:"status"`
-	HCSTopicID            string    `json:"hcsTopicId,omitempty"`
-	HCSSequenceNumber     int64     `json:"hcsSequenceNumber,omitempty"`
-	HCSConsensusTimestamp string    `json:"hcsConsensusTimestamp,omitempty"`
-	HCSTransactionID      string    `json:"hcsTransactionId,omitempty"`
-	HCSRunningHash        string    `json:"hcsRunningHash,omitempty"`
-	CreatedAt             time.Time `json:"createdAt"`
-	UpdatedAt             time.Time `json:"updatedAt"`
-	CreatedBy             string    `json:"createdBy,omitempty"`
-	UpdatedBy             string    `json:"updatedBy,omitempty"`
-	Version               int       `json:"version,omitempty"`
+	ID                    string            `json:"id"`
+	CorrelationID         string            `json:"correlationId"`
+	WorkstreamID          string            `json:"channelId"`
+	CustomerID            string            `json:"customerId,omitempty"`
+	WorkspaceID           string            `json:"workspaceId,omitempty"`
+	InteractionID         string            `json:"interactionId"`
+	Timestamp             time.Time         `json:"timestamp"`
+	SourceDID             string            `json:"sourceDid"`
+	TargetDID             string            `json:"targetDid"`
+	Actor                 InteractionActor  `json:"actor,omitempty"`
+	State                 string            `json:"state,omitempty"`
+	StateID               string            `json:"stateId,omitempty"`
+	StateLabel            string            `json:"stateLabel,omitempty"`
+	ROIClassification     ROIClassification `json:"roiClassification,omitempty"`
+	ROICostIncrement      int               `json:"roiCostIncrement,omitempty"`
+	ROITimeIncrement      int               `json:"roiTimeIncrement,omitempty"`
+	ROICostSavings        int               `json:"roiCostSavings,omitempty"`
+	ROITimeSavings        int               `json:"roiTimeSavings,omitempty"`
+	Signature             Signature         `json:"signature"`
+	Label                 string            `json:"label,omitempty"`
+	Tags                  []string          `json:"tags,omitempty"`
+	PayloadHash           string            `json:"payloadHash"`
+	Status                string            `json:"status"`
+	HCSTopicID            string            `json:"hcsTopicId,omitempty"`
+	HCSSequenceNumber     int64             `json:"hcsSequenceNumber,omitempty"`
+	HCSConsensusTimestamp string            `json:"hcsConsensusTimestamp,omitempty"`
+	HCSTransactionID      string            `json:"hcsTransactionId,omitempty"`
+	HCSRunningHash        string            `json:"hcsRunningHash,omitempty"`
+	CreatedAt             time.Time         `json:"createdAt"`
+	UpdatedAt             time.Time         `json:"updatedAt"`
+	CreatedBy             string            `json:"createdBy,omitempty"`
+	UpdatedBy             string            `json:"updatedBy,omitempty"`
+	Version               int               `json:"version,omitempty"`
 }
 
 // TransactionRequest captures the payload submitted by SDK callers.
 type TransactionRequest struct {
-	CorrelationID string    `json:"correlationId"`
-	ChannelID     string    `json:"channelId,omitempty"`
-	InteractionID string    `json:"interactionId"`
-	Timestamp     time.Time `json:"timestamp,omitempty"`
-	SourceDID     string    `json:"sourceDid,omitempty"`
-	TargetDID     string    `json:"targetDid,omitempty"`
-	Signature     Signature `json:"signature"`
-	Label         string    `json:"label,omitempty"`
-	Tags          []string  `json:"tags,omitempty"`
-	Payload       []byte    `json:"-"`
-	PayloadHash   string    `json:"payloadHash,omitempty"`
+	CorrelationID     string            `json:"correlationId"`
+	WorkstreamID      string            `json:"channelId,omitempty"`
+	InteractionID     string            `json:"interactionId"`
+	Timestamp         time.Time         `json:"timestamp,omitempty"`
+	SourceDID         string            `json:"sourceDid,omitempty"`
+	TargetDID         string            `json:"targetDid,omitempty"`
+	Actor             InteractionActor  `json:"actor,omitempty"`
+	ROIClassification ROIClassification `json:"roiClassification,omitempty"`
+	ROICost           int               `json:"roiCost,omitempty"`
+	ROITime           int               `json:"roiTime,omitempty"`
+	State             string            `json:"state,omitempty"`
+	StateID           string            `json:"stateId,omitempty"`
+	StateLabel        string            `json:"stateLabel,omitempty"`
+	Signature         Signature         `json:"signature"`
+	Label             string            `json:"label,omitempty"`
+	Tags              []string          `json:"tags,omitempty"`
+	Payload           []byte            `json:"-"`
+	PayloadHash       string            `json:"payloadHash,omitempty"`
+	CustomerID        string            `json:"customerId,omitempty"`
+	WorkspaceID       string            `json:"workspaceId,omitempty"`
+	CreatedBy         string            `json:"createdBy,omitempty"`
 }
 
 type InteractionSummary struct {
 	ID                  string
-	ChannelID           string
+	WorkstreamID        string
 	SourceParticipantID string
 	TargetParticipantID string
 	SourceDID           string
 	TargetDID           string
+	Type                InteractionType
+	Actor               InteractionActor
+	States              []string
+	ROIClassification   ROIClassification
+	ROICost             int
+	ROITime             int
 }
 
 type ParticipantSummary struct {
-	ID  string
-	DID string
+	ID           string
+	DID          string
+	Name         string
+	Status       string
+	CustomerID   string
+	WorkstreamID string
 }
 
-// tokenRequest mirrors the JSON payload expected by the identity broker for M2M token issuance.
+// transactionSubmission mirrors the JSON payload expected by the client API for transaction creation.
 type transactionSubmission struct {
-	CorrelationID string    `json:"correlationId"`
-	ChannelID     string    `json:"channelId"`
-	InteractionID string    `json:"interactionId"`
-	Timestamp     string    `json:"timestamp"`
-	SourceDID     string    `json:"sourceDid"`
-	TargetDID     string    `json:"targetDid"`
-	Signature     Signature `json:"signature"`
-	PayloadHash   string    `json:"payloadHash"`
-	Label         string    `json:"label,omitempty"`
-	Tags          []string  `json:"tags,omitempty"`
+	CorrelationID     string            `json:"correlationId"`
+	WorkstreamID      string            `json:"channelId"`
+	InteractionID     string            `json:"interactionId"`
+	Timestamp         string            `json:"timestamp"`
+	SourceDID         string            `json:"sourceDid"`
+	TargetDID         string            `json:"targetDid"`
+	Actor             InteractionActor  `json:"actor,omitempty"`
+	ROIClassification ROIClassification `json:"roiClassification,omitempty"`
+	ROICost           int               `json:"roiCost,omitempty"`
+	ROITime           int               `json:"roiTime,omitempty"`
+	State             string            `json:"state,omitempty"`
+	StateID           string            `json:"stateId,omitempty"`
+	StateLabel        string            `json:"stateLabel,omitempty"`
+	Signature         Signature         `json:"signature"`
+	PayloadHash       string            `json:"payloadHash"`
+	Label             string            `json:"label,omitempty"`
+	Tags              []string          `json:"tags,omitempty"`
 }
 
 // ValidateForSubmit verifies the client-side invariants for a TransactionRequest prior to submission.
@@ -99,8 +163,8 @@ func (r TransactionRequest) ValidateForSubmit() error {
 	if strings.TrimSpace(r.CorrelationID) == "" {
 		return errors.New("CorrelationID is required")
 	}
-	if strings.TrimSpace(r.ChannelID) == "" {
-		return errors.New("ChannelID is required")
+	if strings.TrimSpace(r.WorkstreamID) == "" {
+		return errors.New("WorkstreamID is required")
 	}
 	if strings.TrimSpace(r.InteractionID) == "" {
 		return errors.New("InteractionID is required")
@@ -125,6 +189,11 @@ func (r TransactionRequest) ValidateForSubmit() error {
 	}
 	if strings.TrimSpace(r.Signature.Value) == "" {
 		return errors.New("Signature value is required")
+	}
+	if r.ROIClassification != "" {
+		if !isROIClassification(r.ROIClassification) {
+			return fmt.Errorf("ROIClassification must be one of baseline, increment, savings")
+		}
 	}
 	return nil
 }
@@ -164,6 +233,15 @@ var signingAlgorithms = []string{
 	AlgorithmEd25519,
 	AlgorithmES256,
 	AlgorithmES256K,
+}
+
+func isROIClassification(value ROIClassification) bool {
+	switch value {
+	case ROIClassificationBaseline, ROIClassificationIncrement, ROIClassificationSavings:
+		return true
+	default:
+		return false
+	}
 }
 
 func canonicalSigningAlgorithm(value string) (string, bool) {

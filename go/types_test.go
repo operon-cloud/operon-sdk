@@ -25,7 +25,7 @@ func TestTransactionRequestResolvePayloadMismatch(t *testing.T) {
 func TestTransactionRequestValidateForSubmit(t *testing.T) {
 	req := TransactionRequest{
 		CorrelationID: "123",
-		ChannelID:     "channel",
+		WorkstreamID:  "workstream",
 		InteractionID: "interaction",
 		SourceDID:     "did:example:source",
 		TargetDID:     "did:example:target",
@@ -39,7 +39,7 @@ func TestTransactionRequestValidateForSubmit(t *testing.T) {
 }
 
 func TestTransactionRequestMarshalJSONOmitsZeroTimestamp(t *testing.T) {
-	req := TransactionRequest{CorrelationID: "123", ChannelID: "channel", InteractionID: "interaction", SourceDID: "did:example:source", TargetDID: "did:example:target", Signature: Signature{Algorithm: AlgorithmEd25519, Value: "sig"}, PayloadHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	req := TransactionRequest{CorrelationID: "123", WorkstreamID: "workstream", InteractionID: "interaction", SourceDID: "did:example:source", TargetDID: "did:example:target", Signature: Signature{Algorithm: AlgorithmEd25519, Value: "sig"}, PayloadHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
 	raw, err := req.MarshalJSON()
 	require.NoError(t, err)
 	require.NotContains(t, string(raw), "timestamp")
@@ -75,7 +75,7 @@ func TestValidatePayloadHashFormatSuccess(t *testing.T) {
 func TestTransactionRequestValidateForSubmitErrors(t *testing.T) {
 	base := TransactionRequest{
 		CorrelationID: "corr",
-		ChannelID:     "channel",
+		WorkstreamID:  "workstream",
 		InteractionID: "interaction",
 		SourceDID:     "did:example:source",
 		TargetDID:     "did:example:target",

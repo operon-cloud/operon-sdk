@@ -24,8 +24,11 @@ type ClientAPIConfig struct {
 	HTTPClient HTTPClient
 }
 
-// ChannelDataConfig remains for backward compatibility with earlier helpers.
-type ChannelDataConfig = ClientAPIConfig
+// WorkstreamDataConfig describes the base configuration required for workstream catalogue calls.
+type WorkstreamDataConfig struct {
+	BaseURL    string
+	HTTPClient HTTPClient
+}
 
 func normalizeClientAPIConfig(cfg ClientAPIConfig) (ClientAPIConfig, HTTPClient) {
 	baseURL := strings.TrimSpace(cfg.BaseURL)
@@ -41,6 +44,13 @@ func normalizeClientAPIConfig(cfg ClientAPIConfig) (ClientAPIConfig, HTTPClient)
 	return ClientAPIConfig{
 		BaseURL: strings.TrimRight(baseURL, "/"),
 	}, httpClient
+}
+
+func normalizeWorkstreamConfig(cfg WorkstreamDataConfig) (ClientAPIConfig, HTTPClient) {
+	return normalizeClientAPIConfig(ClientAPIConfig{
+		BaseURL:    cfg.BaseURL,
+		HTTPClient: cfg.HTTPClient,
+	})
 }
 
 // SignHashWithPAT requests a managed signature for the supplied payload hash by calling the Operon client API
@@ -104,9 +114,9 @@ func SubmitTransactionWithPAT(ctx context.Context, cfg ClientAPIConfig, pat stri
 
 	normalized, httpClient := normalizeClientAPIConfig(cfg)
 
-	if strings.TrimSpace(req.ChannelID) == "" {
-		if claims := auth.DecodeTokenClaims(pat); strings.TrimSpace(claims.ChannelID) != "" {
-			req.ChannelID = strings.TrimSpace(claims.ChannelID)
+	if strings.TrimSpace(req.WorkstreamID) == "" {
+		if claims := auth.DecodeTokenClaims(pat); strings.TrimSpace(claims.WorkstreamID) != "" {
+			req.WorkstreamID = strings.TrimSpace(claims.WorkstreamID)
 		}
 	}
 
@@ -142,14 +152,21 @@ func SubmitTransactionWithPAT(ctx context.Context, cfg ClientAPIConfig, pat stri
 	}
 
 	submission := transactionSubmission{
-		CorrelationID: req.CorrelationID,
-		ChannelID:     req.ChannelID,
-		InteractionID: req.InteractionID,
-		Timestamp:     timestamp.Format(time.RFC3339Nano),
-		SourceDID:     req.SourceDID,
-		TargetDID:     req.TargetDID,
-		Signature:     req.Signature,
-		PayloadHash:   payloadHash,
+		CorrelationID:     req.CorrelationID,
+		WorkstreamID:      req.WorkstreamID,
+		InteractionID:     req.InteractionID,
+		Timestamp:         timestamp.Format(time.RFC3339Nano),
+		SourceDID:         req.SourceDID,
+		TargetDID:         req.TargetDID,
+		Actor:             req.Actor,
+		ROIClassification: req.ROIClassification,
+		ROICost:           req.ROICost,
+		ROITime:           req.ROITime,
+		State:             req.State,
+		StateID:           req.StateID,
+		StateLabel:        req.StateLabel,
+		Signature:         req.Signature,
+		PayloadHash:       payloadHash,
 	}
 	if sanitizedLabel != "" {
 		submission.Label = sanitizedLabel

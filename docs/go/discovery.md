@@ -1,16 +1,16 @@
-# Channel Discovery Helpers (Preview)
+# Workstream Discovery Helpers (Preview)
 
 > **Prerequisite:** Complete the [Quick Start](../../go/README.md#quick-start) to configure the Go SDK client.
 
-Many Operon workloads, including sandbox-api, need to understand which interactions and participants are available to the authenticated channel. The Go SDK now exposes convenience helpers that wrap the client API so your service does not have to craft raw HTTP requests.
+Many Operon workloads, including sandbox-api, need to understand which interactions and participants are available to the authenticated workstream. The Go SDK now exposes convenience helpers that wrap the client API so your service does not have to craft raw HTTP requests.
 
-## Fetch channel interactions
+## Fetch workstream interactions
 
 ```go
 ctx := context.Background()
 
-// Uses the channel bound to the PAT by default.
-resp, err := client.GetChannelInteractions(ctx)
+// Uses the workstream bound to the PAT by default.
+resp, err := client.GetWorkstreamInteractions(ctx)
 if err != nil {
     log.Fatalf("load interactions: %v", err)
 }
@@ -20,29 +20,31 @@ for _, interaction := range resp.Interactions {
 }
 ```
 
-If your credentials are scoped to multiple channels, provide an override:
+Interactions may include workstream analytics metadata like `states`, `roiClassification`, `roiCost`, and `roiTime`. These fields surface in `WorkstreamInteraction` and are passed through when caching catalog data.
+
+If your credentials are scoped to multiple workstreams, provide an override:
 
 ```go
-resp, err := client.GetChannelInteractions(ctx, "chnl-123")
+resp, err := client.GetWorkstreamInteractions(ctx, "chnl-123")
 ```
 
-The response mirrors `GET /v1/channels/{channelId}/interactions` from the client API and includes pagination fields should you need them (`totalCount`, `page`, `pageSize`, `hasMore`).
+The response mirrors `GET /v1/channels/{channelId}/interactions` from the client API and includes pagination fields should you need them (`totalCount`, `page`, `pageSize`, `hasMore`). The API still uses `channelId` in the path, even though the SDK surfaces workstreams.
 
 Server-side components that already hold a PAT (for example, sandbox-api after login) can stay SDK-only as well:
 
 ```go
-cfg := operon.ChannelDataConfig{
+cfg := operon.WorkstreamDataConfig{
     BaseURL:    "https://api.operon.cloud/client-api",
     HTTPClient: http.DefaultClient,
 }
 
-resp, err := operon.FetchChannelInteractions(ctx, cfg, patFromCookie)
+resp, err := operon.FetchWorkstreamInteractions(ctx, cfg, patFromCookie)
 ```
 
-## Fetch channel participants
+## Fetch workstream participants
 
 ```go
-resp, err := client.GetChannelParticipants(ctx)
+resp, err := client.GetWorkstreamParticipants(ctx)
 if err != nil {
     log.Fatalf("load participants: %v", err)
 }
@@ -52,18 +54,18 @@ for _, participant := range resp.Participants {
 }
 ```
 
-As with interactions, optional overrides let you query a different channel:
+As with interactions, optional overrides let you query a different workstream:
 
 ```go
-resp, err := client.GetChannelParticipants(ctx, "chnl-123")
+resp, err := client.GetWorkstreamParticipants(ctx, "chnl-123")
 ```
 
-Both helpers infer the PAT to send on the request, handle API error decoding, and keep the SDK’s channel cache consistent. This keeps your service fully SDK-driven while aligning with Operon’s auth standards.
+Both helpers infer the PAT to send on the request, handle API error decoding, and keep the SDK’s workstream cache consistent. This keeps your service fully SDK-driven while aligning with Operon’s auth standards.
 
 And the PAT-centric helper mirrors the interactions example:
 
 ```go
-resp, err := operon.FetchChannelParticipants(ctx, cfg, patFromCookie)
+resp, err := operon.FetchWorkstreamParticipants(ctx, cfg, patFromCookie)
 ```
 
 ## Sign payload hashes with a PAT
@@ -92,7 +94,7 @@ if err != nil {
 
 req := operon.TransactionRequest{
     CorrelationID: correlationID,
-    ChannelID:     channelID,
+    WorkstreamID:  workstreamID,
     InteractionID: interactionID,
     Timestamp:     time.Now().UTC(),
     SourceDID:     sourceDID,

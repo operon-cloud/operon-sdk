@@ -19,15 +19,15 @@ func TestClientCachedParticipantDID(t *testing.T) {
 func TestPopulateInteractionFieldsFillsFromRegistry(t *testing.T) {
 	client := &Client{registry: catalog.NewRegistry()}
 	client.registry.ReplaceInteractions([]catalog.Interaction{{
-		ID:        "intr-1",
-		ChannelID: "channel-1",
-		SourceDID: "did:example:source",
-		TargetDID: "did:example:target",
+		ID:           "intr-1",
+		WorkstreamID: "workstream-1",
+		SourceDID:    "did:example:source",
+		TargetDID:    "did:example:target",
 	}})
 
 	req := TransactionRequest{CorrelationID: "corr-1", InteractionID: "intr-1"}
 	require.NoError(t, client.populateInteractionFields(context.Background(), &req))
-	require.Equal(t, "channel-1", req.ChannelID)
+	require.Equal(t, "workstream-1", req.WorkstreamID)
 	require.Equal(t, "did:example:source", req.SourceDID)
 	require.Equal(t, "did:example:target", req.TargetDID)
 }
@@ -35,8 +35,8 @@ func TestPopulateInteractionFieldsFillsFromRegistry(t *testing.T) {
 func TestPopulateInteractionFieldsMissingDIDs(t *testing.T) {
 	client := &Client{registry: catalog.NewRegistry()}
 	client.registry.ReplaceInteractions([]catalog.Interaction{{
-		ID:        "intr-2",
-		ChannelID: "channel-2",
+		ID:           "intr-2",
+		WorkstreamID: "workstream-2",
 	}})
 
 	req := TransactionRequest{CorrelationID: "corr-2", InteractionID: "intr-2"}
@@ -47,17 +47,17 @@ func TestPopulateInteractionFieldsMissingDIDs(t *testing.T) {
 func TestPopulateInteractionFieldsUsesParticipantFallback(t *testing.T) {
 	client := &Client{registry: catalog.NewRegistry()}
 	client.participantDID = "did:example:fallback"
-	client.channelID = "chnl-fallback"
+	client.workstreamID = "wrk-fallback"
 
 	req := TransactionRequest{CorrelationID: "corr-3"}
 	require.NoError(t, client.populateInteractionFields(context.Background(), &req))
 	require.Equal(t, "did:example:fallback", req.SourceDID)
-	require.Equal(t, "chnl-fallback", req.ChannelID)
+	require.Equal(t, "wrk-fallback", req.WorkstreamID)
 }
 
-func TestPopulateInteractionFieldsUsesChannelFallbackWhenInteractionMetadataMissing(t *testing.T) {
+func TestPopulateInteractionFieldsUsesWorkstreamFallbackWhenInteractionMetadataMissing(t *testing.T) {
 	client := &Client{registry: catalog.NewRegistry()}
-	client.channelID = "chnl-fallback"
+	client.workstreamID = "wrk-fallback"
 	client.registry.ReplaceInteractions([]catalog.Interaction{{
 		ID:        "intr-3",
 		SourceDID: "did:example:source",
@@ -66,7 +66,7 @@ func TestPopulateInteractionFieldsUsesChannelFallbackWhenInteractionMetadataMiss
 
 	req := TransactionRequest{CorrelationID: "corr-4", InteractionID: "intr-3"}
 	require.NoError(t, client.populateInteractionFields(context.Background(), &req))
-	require.Equal(t, "chnl-fallback", req.ChannelID)
+	require.Equal(t, "wrk-fallback", req.WorkstreamID)
 	require.Equal(t, "did:example:source", req.SourceDID)
 	require.Equal(t, "did:example:target", req.TargetDID)
 }

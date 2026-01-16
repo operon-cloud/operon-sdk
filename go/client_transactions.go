@@ -82,14 +82,21 @@ func (c *Client) SubmitTransaction(ctx context.Context, req TransactionRequest) 
 	}
 
 	apiReq := transactionSubmission{
-		CorrelationID: req.CorrelationID,
-		ChannelID:     req.ChannelID,
-		InteractionID: req.InteractionID,
-		Timestamp:     timestamp.Format(time.RFC3339Nano),
-		SourceDID:     req.SourceDID,
-		TargetDID:     req.TargetDID,
-		Signature:     signature,
-		PayloadHash:   payloadHash,
+		CorrelationID:     req.CorrelationID,
+		WorkstreamID:      req.WorkstreamID,
+		InteractionID:     req.InteractionID,
+		Timestamp:         timestamp.Format(time.RFC3339Nano),
+		SourceDID:         req.SourceDID,
+		TargetDID:         req.TargetDID,
+		Actor:             req.Actor,
+		ROIClassification: req.ROIClassification,
+		ROICost:           req.ROICost,
+		ROITime:           req.ROITime,
+		State:             req.State,
+		StateID:           req.StateID,
+		StateLabel:        req.StateLabel,
+		Signature:         signature,
+		PayloadHash:       payloadHash,
 	}
 	if sanitizedLabel != "" {
 		apiReq.Label = sanitizedLabel

@@ -27,7 +27,7 @@ type tokenResponse struct {
 
 type transactionSubmission struct {
 	CorrelationID string           `json:"correlationId"`
-	ChannelID     string           `json:"channelId"`
+	WorkstreamID  string           `json:"channelId"`
 	InteractionID string           `json:"interactionId"`
 	Timestamp     string           `json:"timestamp"`
 	SourceDID     string           `json:"sourceDid"`
@@ -132,7 +132,7 @@ func TestClientSubmitTransactionWithSelfSigning(t *testing.T) {
 			response := map[string]any{
 				"id":            "txn-123",
 				"correlationId": captured.CorrelationID,
-				"channelId":     captured.ChannelID,
+				"channelId":     captured.WorkstreamID,
 				"interactionId": captured.InteractionID,
 				"sourceDid":     captured.SourceDID,
 				"targetDid":     captured.TargetDID,
@@ -170,7 +170,7 @@ func TestClientSubmitTransactionWithSelfSigning(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "txn-123", txn.ID)
 	require.Equal(t, "received", txn.Status)
-	require.Equal(t, "channel-abc", txn.ChannelID)
+	require.Equal(t, "channel-abc", txn.WorkstreamID)
 	require.Equal(t, "did:example:target", txn.TargetDID)
 	require.Equal(t, []string{"env:demo"}, captured.Tags)
 	require.Equal(t, int32(1), atomic.LoadInt32(&tokenCalls))
@@ -212,7 +212,7 @@ func TestClientSubmitTransactionWithManualSignature(t *testing.T) {
 			var body transactionSubmission
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 			require.Equal(t, "manual-signature", body.Signature.Value)
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "txn-456", "status": "received", "correlationId": body.CorrelationID, "channelId": body.ChannelID, "interactionId": body.InteractionID, "sourceDid": body.SourceDID, "targetDid": body.TargetDID, "timestamp": time.Now(), "createdAt": time.Now(), "updatedAt": time.Now(), "signature": map[string]any{"algorithm": body.Signature.Algorithm, "value": body.Signature.Value}}))
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "txn-456", "status": "received", "correlationId": body.CorrelationID, "channelId": body.WorkstreamID, "interactionId": body.InteractionID, "sourceDid": body.SourceDID, "targetDid": body.TargetDID, "timestamp": time.Now(), "createdAt": time.Now(), "updatedAt": time.Now(), "signature": map[string]any{"algorithm": body.Signature.Algorithm, "value": body.Signature.Value}}))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -226,7 +226,7 @@ func TestClientSubmitTransactionWithManualSignature(t *testing.T) {
 
 	req := operon.TransactionRequest{
 		CorrelationID: "ext-002",
-		ChannelID:     "manual-channel",
+		WorkstreamID:  "manual-channel",
 		InteractionID: "manual-interaction",
 		SourceDID:     "did:example:source",
 		TargetDID:     "did:example:target",
@@ -637,7 +637,7 @@ func TestSubmitTransactionAddsKeyIDWhenMissing(t *testing.T) {
 				"id":            "txn-789",
 				"status":        "received",
 				"correlationId": body.CorrelationID,
-				"channelId":     body.ChannelID,
+				"channelId":     body.WorkstreamID,
 				"interactionId": body.InteractionID,
 				"sourceDid":     body.SourceDID,
 				"targetDid":     body.TargetDID,

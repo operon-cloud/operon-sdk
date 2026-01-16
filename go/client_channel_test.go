@@ -13,7 +13,7 @@ import (
 	operon "github.com/operon-cloud/operon-sdk/go"
 )
 
-func TestClientGetChannelInteractionsUsesTokenChannel(t *testing.T) {
+func TestClientGetWorkstreamInteractionsUsesTokenWorkstream(t *testing.T) {
 	tokenValue := newTokenWithClaims(map[string]any{
 		"participant_did": "did:example:source",
 		"channel_id":      "channel-abc",
@@ -27,14 +27,14 @@ func TestClientGetChannelInteractionsUsesTokenChannel(t *testing.T) {
 		case "/v1/channels/channel-abc/interactions":
 			require.Equal(t, http.MethodGet, r.Method)
 			require.Equal(t, "Bearer "+tokenValue, r.Header.Get("Authorization"))
-			payload := operon.ChannelInteractionsResponse{
-				Interactions: []operon.ChannelInteraction{
+			payload := operon.WorkstreamInteractionsResponse{
+				Interactions: []operon.WorkstreamInteraction{
 					{
 						ID:                  "interaction-1",
 						Status:              "active",
 						SourceParticipantID: "participant-src",
 						TargetParticipantID: "participant-dst",
-						Channels:            []string{"channel-abc"},
+						Workstreams:         []string{"channel-abc"},
 						CreatedAt:           time.Now().UTC(),
 						UpdatedAt:           time.Now().UTC(),
 					},
@@ -56,13 +56,13 @@ func TestClientGetChannelInteractionsUsesTokenChannel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	resp, err := client.GetChannelInteractions(ctx)
+	resp, err := client.GetWorkstreamInteractions(ctx)
 	require.NoError(t, err)
 	require.Len(t, resp.Interactions, 1)
 	require.Equal(t, "interaction-1", resp.Interactions[0].ID)
 }
 
-func TestClientGetChannelParticipantsAllowsOverride(t *testing.T) {
+func TestClientGetWorkstreamParticipantsAllowsOverride(t *testing.T) {
 	tokenValue := newTokenWithoutParticipantDID()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -73,8 +73,8 @@ func TestClientGetChannelParticipantsAllowsOverride(t *testing.T) {
 		case "/v1/channels/channel-override/participants":
 			require.Equal(t, http.MethodGet, r.Method)
 			require.Equal(t, "Bearer "+tokenValue, r.Header.Get("Authorization"))
-			payload := operon.ChannelParticipantsResponse{
-				Participants: []operon.ChannelParticipant{
+			payload := operon.WorkstreamParticipantsResponse{
+				Participants: []operon.WorkstreamParticipant{
 					{
 						ID:        "participant-1",
 						DID:       "did:example:participant",
@@ -100,13 +100,13 @@ func TestClientGetChannelParticipantsAllowsOverride(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	resp, err := client.GetChannelParticipants(ctx, "channel-override")
+	resp, err := client.GetWorkstreamParticipants(ctx, "channel-override")
 	require.NoError(t, err)
 	require.Len(t, resp.Participants, 1)
 	require.Equal(t, "participant-1", resp.Participants[0].ID)
 }
 
-func TestClientGetChannelInteractionsErrorsWithoutChannel(t *testing.T) {
+func TestClientGetWorkstreamInteractionsErrorsWithoutWorkstream(t *testing.T) {
 	var pathCalled string
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -126,13 +126,13 @@ func TestClientGetChannelInteractionsErrorsWithoutChannel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	_, err := client.GetChannelInteractions(ctx)
+	_, err := client.GetWorkstreamInteractions(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "channel ID is required")
+	require.Contains(t, err.Error(), "workstream ID is required")
 	require.Equal(t, "/token", pathCalled)
 }
 
-func TestFetchChannelInteractionsUsesPATClaim(t *testing.T) {
+func TestFetchWorkstreamInteractionsUsesPATClaim(t *testing.T) {
 	pat := newTokenWithClaims(map[string]any{
 		"participant_did": "did:example:source",
 		"channel_id":      "channel-xyz",
@@ -143,8 +143,8 @@ func TestFetchChannelInteractionsUsesPATClaim(t *testing.T) {
 		require.Equal(t, http.MethodGet, r.Method)
 		require.Equal(t, "Bearer "+pat, r.Header.Get("Authorization"))
 
-		payload := operon.ChannelInteractionsResponse{
-			Interactions: []operon.ChannelInteraction{
+		payload := operon.WorkstreamInteractionsResponse{
+			Interactions: []operon.WorkstreamInteraction{
 				{
 					ID:        "interaction-xyz",
 					Status:    "active",
@@ -164,18 +164,18 @@ func TestFetchChannelInteractionsUsesPATClaim(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	cfg := operon.ChannelDataConfig{
+	cfg := operon.WorkstreamDataConfig{
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	resp, err := operon.FetchChannelInteractions(ctx, cfg, pat)
+	resp, err := operon.FetchWorkstreamInteractions(ctx, cfg, pat)
 	require.NoError(t, err)
 	require.Len(t, resp.Interactions, 1)
 	require.Equal(t, "interaction-xyz", resp.Interactions[0].ID)
 }
 
-func TestFetchChannelParticipantsAllowsOverride(t *testing.T) {
+func TestFetchWorkstreamParticipantsAllowsOverride(t *testing.T) {
 	pat := newTokenWithoutParticipantDID()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -183,8 +183,8 @@ func TestFetchChannelParticipantsAllowsOverride(t *testing.T) {
 		require.Equal(t, http.MethodGet, r.Method)
 		require.Equal(t, "Bearer "+pat, r.Header.Get("Authorization"))
 
-		payload := operon.ChannelParticipantsResponse{
-			Participants: []operon.ChannelParticipant{
+		payload := operon.WorkstreamParticipantsResponse{
+			Participants: []operon.WorkstreamParticipant{
 				{
 					ID:        "participant-override",
 					DID:       "did:example:override",
@@ -205,24 +205,24 @@ func TestFetchChannelParticipantsAllowsOverride(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	cfg := operon.ChannelDataConfig{
+	cfg := operon.WorkstreamDataConfig{
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	resp, err := operon.FetchChannelParticipants(ctx, cfg, pat, "channel-override")
+	resp, err := operon.FetchWorkstreamParticipants(ctx, cfg, pat, "channel-override")
 	require.NoError(t, err)
 	require.Len(t, resp.Participants, 1)
 	require.Equal(t, "participant-override", resp.Participants[0].ID)
 }
 
-func TestFetchChannelInteractionsFailsWithoutChannel(t *testing.T) {
+func TestFetchWorkstreamInteractionsFailsWithoutWorkstream(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	cfg := operon.ChannelDataConfig{}
+	cfg := operon.WorkstreamDataConfig{}
 
-	_, err := operon.FetchChannelInteractions(ctx, cfg, newTokenWithoutParticipantDID())
+	_, err := operon.FetchWorkstreamInteractions(ctx, cfg, newTokenWithoutParticipantDID())
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "channel ID is required")
+	require.Contains(t, err.Error(), "workstream ID is required")
 }

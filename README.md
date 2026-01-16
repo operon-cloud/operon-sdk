@@ -23,13 +23,15 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 
 The Go package provides direct access to Operon’s transaction APIs, interaction catalog, and signature utilities.
 
+Transactions support workstream analytics metadata such as state/queue labels and ROI classifications so value metrics can be tracked alongside audit records.
+
 ### Installation
 
 ```bash
 go get github.com/operon-cloud/operon-sdk/go@latest
 ```
 
-Ensure your Go toolchain is at least **Go 1.21** (matching the module’s `go.mod` requirement).
+Ensure your Go toolchain is at least **Go 1.25** (matching the module’s `go.mod` requirement).
 
 ### Quick Start
 
@@ -48,7 +50,6 @@ func main() {
 	client, err := operon.NewClient(operon.Config{
 		ClientID:     "<CLIENT_ID>",
 		ClientSecret: "<CLIENT_SECRET>",
-		HTTPTimeout:  10 * time.Second,
 		// Optional: override defaults when targeting non-production environments.
 		// BaseURL:  "https://api.dev.operon.cloud/client-api",
 		// TokenURL: "https://auth.dev.operon.cloud/oauth2/token",
@@ -64,18 +65,18 @@ func main() {
 		log.Fatalf("bootstrap session: %v", err)
 	}
 
-txn, err := client.SubmitTransaction(ctx, operon.TransactionRequest{
-	InteractionID:  "int-123",
-	CorrelationID:  "lead-abc",
-	Label:          "Sales lead ingestion",
-	Payload:        []byte(`{"leadId":"lead-abc","useCase":"B2B onboarding"}`),
-		Tags:           []string{"channel:corporate-api", "priority:high"},
+	txn, err := client.SubmitTransaction(ctx, operon.TransactionRequest{
+		InteractionID: "int-123",
+		CorrelationID: "lead-abc",
+		Label:         "Sales lead ingestion",
+		Payload:       []byte(`{"leadId":"lead-abc","useCase":"B2B onboarding"}`),
+		Tags:          []string{"workstream:corporate-api", "priority:high"},
 	})
 	if err != nil {
 		log.Fatalf("submit transaction: %v", err)
 	}
 
-log.Printf("transaction accepted (id=%s status=%s)", txn.ID, txn.Status)
+	log.Printf("transaction accepted (id=%s status=%s)", txn.ID, txn.Status)
 }
 ```
 
@@ -84,15 +85,19 @@ log.Printf("transaction accepted (id=%s status=%s)", txn.ID, txn.Status)
 
 ### Configuration Reference
 
-| Field            | Description                                              | Example                                          |
-|------------------|----------------------------------------------------------|--------------------------------------------------|
-| `BaseURL`        | Optional; defaults to Operon production API base. Override for dev/QA environments. | `https://api.dev.operon.cloud/client-api`        |
-| `TokenURL`       | Optional; defaults to the production OAuth2 token issuer. Override for dev/QA environments. | `https://auth.dev.operon.cloud/oauth2/token` |
-| `ClientID`       | Issued client identifier                                 | `m2mc-xxxxx`                                    |
-| `ClientSecret`   | One-time secret accompanying the client ID               | `super-secret-value`                            |
-| `HTTPTimeout`    | Global timeout applied to outbound HTTP calls            | `10 * time.Second`                              |
-| `Scopes`         | Optional scopes override (defaults to Operon defaults)   | `[]string{"transactions:write"}`                |
-| `Logger`         | Custom `*zap.Logger`; falls back to `zap.NewNop()`       | `zap.NewExample()`                              |
+| Field                     | Description                                                                 | Example                                          |
+|---------------------------|-----------------------------------------------------------------------------|--------------------------------------------------|
+| `BaseURL`                 | Optional; defaults to Operon production API base. Override for dev/QA environments. | `https://api.dev.operon.cloud/client-api`        |
+| `TokenURL`                | Optional; defaults to the production OAuth2 token issuer. Override for dev/QA environments. | `https://auth.dev.operon.cloud/oauth2/token` |
+| `ClientID`                | Issued client identifier                                                    | `m2mc-xxxxx`                                    |
+| `ClientSecret`            | One-time secret accompanying the client ID                                  | `super-secret-value`                            |
+| `Scope`                   | Optional OAuth2 scope override                                              | `transactions:write`                            |
+| `Audience`                | Optional OAuth2 audience override                                           | `[]string{"https://api.operon.cloud"}`          |
+| `HTTPClient`              | Custom HTTP client; defaults to `http.Client{Timeout: 30s}`                 | `&http.Client{Timeout: 10 * time.Second}`       |
+| `TokenLeeway`             | Refresh tokens before expiry                                                | `30 * time.Second`                              |
+| `DisableSelfSign`         | Disable managed signing (requires manual signature)                         | `true`                                          |
+| `SigningAlgorithm`        | Default signing algorithm                                                   | `operon.AlgorithmES256`                         |
+| `SessionHeartbeatInterval`| Enable PAT keep-alive pings                                                  | `2 * time.Minute`                               |
 
 See the Go package’s [README](./go/README.md) for API-by-API details, advanced configuration, and testing utilities.
 

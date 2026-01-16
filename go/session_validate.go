@@ -27,7 +27,7 @@ type SessionInfo struct {
 	CustomerID       string
 	Roles            []string
 	FeatureFlags     map[string]interface{}
-	ChannelID        string
+	WorkstreamID     string
 	WorkspaceID      string
 	ParticipantDID   string
 	ParticipantID    string
@@ -110,7 +110,7 @@ func ValidateSession(ctx context.Context, cfg SessionValidationConfig, pat strin
 		CustomerID:       payload.CustomerID,
 		Roles:            append([]string(nil), payload.Roles...),
 		FeatureFlags:     payload.FeatureFlags,
-		ChannelID:        claims.ChannelID,
+		WorkstreamID:     claims.WorkstreamID,
 		WorkspaceID:      claims.WorkspaceID,
 		ParticipantDID:   claims.ParticipantDID,
 		ParticipantID:    claims.ParticipantID,

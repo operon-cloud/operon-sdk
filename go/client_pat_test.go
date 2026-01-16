@@ -114,7 +114,7 @@ func TestSubmitTransactionWithPATSuccess(t *testing.T) {
 
 	req := operon.TransactionRequest{
 		CorrelationID: "corr-1",
-		ChannelID:     "channel-123",
+		WorkstreamID:  "channel-123",
 		InteractionID: "interaction-xyz",
 		SourceDID:     "did:example:source",
 		TargetDID:     "did:example:target",
@@ -143,7 +143,7 @@ func TestSubmitTransactionWithPATAPIFailure(t *testing.T) {
 
 	req := operon.TransactionRequest{
 		CorrelationID: "corr-1",
-		ChannelID:     "channel-123",
+		WorkstreamID:  "channel-123",
 		InteractionID: "interaction-xyz",
 		SourceDID:     "did:example:source",
 		TargetDID:     "did:example:target",

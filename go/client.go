@@ -43,7 +43,7 @@ type Client struct {
 
 	participantMu  sync.RWMutex
 	participantDID string
-	channelID      string
+	workstreamID   string
 	customerID     string
 	workspaceID    string
 	email          string
@@ -145,8 +145,8 @@ func (c *Client) tokenValue(ctx context.Context) (string, error) {
 	if did := strings.TrimSpace(token.ParticipantDID); did != "" {
 		c.participantDID = did
 	}
-	if channel := strings.TrimSpace(token.ChannelID); channel != "" {
-		c.channelID = channel
+	if workstream := strings.TrimSpace(token.WorkstreamID); workstream != "" {
+		c.workstreamID = workstream
 	}
 	if customer := strings.TrimSpace(token.CustomerID); customer != "" {
 		c.customerID = customer
@@ -190,8 +190,8 @@ func (c *Client) cachedParticipantDID() string {
 	return c.participantDID
 }
 
-func (c *Client) cachedChannelID() string {
+func (c *Client) cachedWorkstreamID() string {
 	c.participantMu.RLock()
 	defer c.participantMu.RUnlock()
-	return c.channelID
+	return c.workstreamID
 }

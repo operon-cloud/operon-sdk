@@ -57,7 +57,7 @@ func TestClientCredentialsManagerCachesTokens(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, fmt.Sprintf("header.%s.signature", payload), token.AccessToken)
 	require.Equal(t, "did:example:source", token.ParticipantDID)
-	require.Equal(t, "chnl-123", token.ChannelID)
+	require.Equal(t, "chnl-123", token.WorkstreamID)
 	require.Equal(t, "cust-456", token.CustomerID)
 	require.Equal(t, "wksp-789", token.WorkspaceID)
 	require.Equal(t, "user@example.com", token.Email)
@@ -108,28 +108,4 @@ func TestNewClientCredentialsManagerValidation(t *testing.T) {
 
 func TestExtractParticipantDIDHandlesInvalidToken(t *testing.T) {
 	require.Equal(t, "", extractParticipantDID("invalid"))
-}
-
-func TestClientCredentialsManagerLegacyBrokerPayload(t *testing.T) {
-	body := `{"access_token":"token","token_type":"Bearer","expires_in":3600}`
-	mock := &mockDoer{responses: []*http.Response{newResponse(http.StatusOK, body)}}
-
-	manager, err := NewClientCredentialsManager(ClientCredentialsConfig{
-		TokenURL:     "https://identity.local/v1/session/m2m",
-		ClientID:     "client",
-		ClientSecret: "secret",
-		HTTPClient:   mock,
-	})
-	require.NoError(t, err)
-
-	_, err = manager.Token(context.Background())
-	require.NoError(t, err)
-
-	require.Len(t, mock.requests, 1)
-	req := mock.requests[0]
-	require.Equal(t, "application/json", req.Header.Get("Content-Type"))
-	bodyBytes, err := io.ReadAll(req.Body)
-	require.NoError(t, err)
-	_ = req.Body.Close()
-	require.Contains(t, string(bodyBytes), "\"client_id\":\"client\"")
 }

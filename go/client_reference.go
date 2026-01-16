@@ -28,11 +28,17 @@ func (c *Client) Interactions(ctx context.Context) ([]InteractionSummary, error)
 	for _, item := range items {
 		result = append(result, InteractionSummary{
 			ID:                  item.ID,
-			ChannelID:           item.ChannelID,
+			WorkstreamID:        item.WorkstreamID,
 			SourceParticipantID: item.SourceParticipantID,
 			TargetParticipantID: item.TargetParticipantID,
 			SourceDID:           item.SourceDID,
 			TargetDID:           item.TargetDID,
+			Type:                InteractionType(item.Type),
+			Actor:               InteractionActor(item.Actor),
+			States:              append([]string(nil), item.States...),
+			ROIClassification:   ROIClassification(item.ROIClassification),
+			ROICost:             item.ROICost,
+			ROITime:             item.ROITime,
 		})
 	}
 	return result, nil
@@ -51,7 +57,14 @@ func (c *Client) Participants(ctx context.Context) ([]ParticipantSummary, error)
 	items := c.registry.Participants()
 	result := make([]ParticipantSummary, 0, len(items))
 	for _, item := range items {
-		result = append(result, ParticipantSummary{ID: item.ID, DID: item.DID})
+		result = append(result, ParticipantSummary{
+			ID:           item.ID,
+			DID:          item.DID,
+			Name:         item.Name,
+			Status:       item.Status,
+			CustomerID:   item.CustomerID,
+			WorkstreamID: item.WorkstreamID,
+		})
 	}
 	return result, nil
 }
@@ -85,9 +98,9 @@ func (c *Client) reloadReferenceData(ctx context.Context) error {
 }
 
 func (c *Client) populateInteractionFields(ctx context.Context, req *TransactionRequest) error {
-	if strings.TrimSpace(req.ChannelID) == "" {
-		if channel := c.cachedChannelID(); channel != "" {
-			req.ChannelID = channel
+	if strings.TrimSpace(req.WorkstreamID) == "" {
+		if workstream := c.cachedWorkstreamID(); workstream != "" {
+			req.WorkstreamID = workstream
 		}
 	}
 
@@ -98,9 +111,9 @@ func (c *Client) populateInteractionFields(ctx context.Context, req *Transaction
 			}
 		}
 
-		if strings.TrimSpace(req.ChannelID) == "" {
-			if channel := c.cachedChannelID(); channel != "" {
-				req.ChannelID = channel
+		if strings.TrimSpace(req.WorkstreamID) == "" {
+			if workstream := c.cachedWorkstreamID(); workstream != "" {
+				req.WorkstreamID = workstream
 			}
 		}
 		return nil
@@ -119,12 +132,12 @@ func (c *Client) populateInteractionFields(ctx context.Context, req *Transaction
 		}
 	}
 
-	log.Printf("[operon-sdk] resolving interaction %s (channel %s, sourceParticipant %s, targetParticipant %s)", req.InteractionID, meta.ChannelID, meta.SourceParticipantID, meta.TargetParticipantID)
-	if strings.TrimSpace(req.ChannelID) == "" {
-		if meta.ChannelID != "" {
-			req.ChannelID = meta.ChannelID
-		} else if channel := c.cachedChannelID(); channel != "" {
-			req.ChannelID = channel
+	log.Printf("[operon-sdk] resolving interaction %s (workstream %s, sourceParticipant %s, targetParticipant %s)", req.InteractionID, meta.WorkstreamID, meta.SourceParticipantID, meta.TargetParticipantID)
+	if strings.TrimSpace(req.WorkstreamID) == "" {
+		if meta.WorkstreamID != "" {
+			req.WorkstreamID = meta.WorkstreamID
+		} else if workstream := c.cachedWorkstreamID(); workstream != "" {
+			req.WorkstreamID = workstream
 		}
 	}
 	if strings.TrimSpace(req.SourceDID) == "" {
@@ -170,7 +183,7 @@ func (c *Client) loadReferenceData(ctx context.Context) error {
 	if len(interactions) > 0 {
 		details := make([]string, 0, len(interactions))
 		for _, item := range interactions {
-			details = append(details, fmt.Sprintf("%s(channel=%s, sourceParticipant=%s, targetParticipant=%s)", item.ID, item.ChannelID, item.SourceParticipantID, item.TargetParticipantID))
+			details = append(details, fmt.Sprintf("%s(workstream=%s, sourceParticipant=%s, targetParticipant=%s)", item.ID, item.WorkstreamID, item.SourceParticipantID, item.TargetParticipantID))
 		}
 		log.Printf("[operon-sdk] fetched %d interactions: %s", len(interactions), strings.Join(details, "; "))
 	} else {
@@ -228,10 +241,16 @@ func (c *Client) fetchInteractions(ctx context.Context, token string) ([]catalog
 
 	var payload struct {
 		Data []struct {
-			ID                  string `json:"id"`
-			ChannelID           string `json:"channelId"`
-			SourceParticipantID string `json:"sourceParticipantId"`
-			TargetParticipantID string `json:"targetParticipantId"`
+			ID                  string                    `json:"id"`
+			WorkstreamID        string                    `json:"channelId"`
+			SourceParticipantID string                    `json:"sourceParticipantId"`
+			TargetParticipantID string                    `json:"targetParticipantId"`
+			Type                catalog.InteractionType   `json:"type"`
+			Actor               catalog.InteractionActor  `json:"actor"`
+			States              []string                  `json:"states"`
+			ROIClassification   catalog.ROIClassification `json:"roiClassification"`
+			ROICost             int                       `json:"roiCost"`
+			ROITime             int                       `json:"roiTime"`
 		} `json:"data"`
 	}
 
@@ -244,9 +263,15 @@ func (c *Client) fetchInteractions(ctx context.Context, token string) ([]catalog
 	for _, item := range payload.Data {
 		result = append(result, catalog.Interaction{
 			ID:                  item.ID,
-			ChannelID:           item.ChannelID,
+			WorkstreamID:        item.WorkstreamID,
 			SourceParticipantID: item.SourceParticipantID,
 			TargetParticipantID: item.TargetParticipantID,
+			Type:                item.Type,
+			Actor:               item.Actor,
+			States:              append([]string(nil), item.States...),
+			ROIClassification:   item.ROIClassification,
+			ROICost:             item.ROICost,
+			ROITime:             item.ROITime,
 		})
 	}
 	return result, nil
@@ -271,8 +296,12 @@ func (c *Client) fetchParticipants(ctx context.Context, token string) ([]catalog
 
 	var payload struct {
 		Data []struct {
-			ID  string `json:"id"`
-			DID string `json:"did"`
+			ID           string `json:"id"`
+			DID          string `json:"did"`
+			Name         string `json:"name"`
+			Status       string `json:"status"`
+			CustomerID   string `json:"customerId"`
+			WorkstreamID string `json:"channelId"`
 		} `json:"data"`
 	}
 
@@ -286,7 +315,14 @@ func (c *Client) fetchParticipants(ctx context.Context, token string) ([]catalog
 		if item.ID == "" || item.DID == "" {
 			continue
 		}
-		result = append(result, catalog.Participant{ID: item.ID, DID: item.DID})
+		result = append(result, catalog.Participant{
+			ID:           item.ID,
+			DID:          item.DID,
+			Name:         item.Name,
+			Status:       item.Status,
+			CustomerID:   item.CustomerID,
+			WorkstreamID: item.WorkstreamID,
+		})
 	}
 	return result, nil
 }

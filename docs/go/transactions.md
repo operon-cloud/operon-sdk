@@ -1,12 +1,12 @@
 # Submit a Transaction (Go SDK)
 
-This guide walks through the end-to-end flow for submitting a signed transaction to the Operon Client API using the Go SDK. The same pattern underpins audit/event submissions for channel participants.
+This guide walks through the end-to-end flow for submitting a signed transaction to the Operon Client API using the Go SDK. The same pattern underpins audit/event submissions for workstream participants.
 
 ## Prerequisites
 
-- Operon client credentials (Client ID + Client Secret) with permission to access the target channel.
+- Operon client credentials (Client ID + Client Secret) with permission to access the target workstream.
 - An interaction ID that binds the source and target participants for the transaction you want to post.
-- Go 1.21+ installed locally.
+- Go 1.25+ installed locally.
 
 ## 1. Install the SDK
 
@@ -45,19 +45,30 @@ if err := client.Init(ctx); err != nil {
 ```go
 req := operon.TransactionRequest{
     CorrelationID: "ext-123",         // caller-defined idempotency key
-    InteractionID: "interaction-xyz", // binds channel + participants
+    WorkstreamID:  "wrk-123",
+    InteractionID: "interaction-xyz", // binds workstream + participants
     Label:         "Demo payload",
     Tags:          []string{"source:demo"},
     Payload:       []byte("... raw payload ..."),
     Timestamp:     time.Now().UTC(),  // optional; defaults to current UTC time
+    Actor:         operon.InteractionActorHuman,
+    State:         "received",
+    StateID:       "queue-001",
+    StateLabel:    "Intake",
+    ROIClassification: operon.ROIClassificationIncrement,
+    ROICost:       25,
+    ROITime:       30,
 }
 ```
 
 Key points:
 
 - Provide either `Payload` (bytes) or `PayloadHash` (base64url SHA-256). The SDK calculates the hash locally when `Payload` is supplied and **only** transmits the hash to Operon; raw payload bytes never leave your service.
-- When interaction metadata is cached, the SDK fills `ChannelID`, `SourceDID`, and `TargetDID` automatically. Provide them explicitly if you disable cache usage.
+- When interaction metadata is cached, the SDK fills `WorkstreamID`, `SourceDID`, and `TargetDID` automatically. Provide them explicitly if you disable cache usage.
 - `CorrelationID` enforces idempotency. Choose a deterministic value per logical transaction.
+- Use `State`, `StateID`, and `StateLabel` to align with workstream state/queue analytics.
+- Use `ROIClassification` with `ROICost` and `ROITime` to record baseline, increment, or savings value metrics.
+- Use `Actor` when you need to tag transactions with the executing agent (recommended values: `operon.InteractionActorHuman`, `operon.InteractionActorAI`, `operon.InteractionActorHybrid`, `operon.InteractionActorNonAI`).
 
 ## 4. Submit the transaction
 
@@ -87,7 +98,7 @@ The returned `Transaction` struct includes consensus metadata, timestamps, and s
 | `CorrelationID is required` | Request omitted `CorrelationID` | Provide a non-empty value |
 | `interaction xyz not found` | Local cache stale | Call `client.Init` or re-run after `client.reloadReferenceData` logs refresh |
 | `automatic signing disabled` | `DisableSelfSign` enabled without `Signature` provided | Either supply `Signature` manually or remove the flag |
-| 401/403 responses | PAT missing scope or channel inactive | Verify credentials, channel status, and ensure PAT header is fresh |
+| 401/403 responses | PAT missing scope or workstream inactive | Verify credentials, workstream status, and ensure PAT header is fresh |
 
 ## Next steps
 
