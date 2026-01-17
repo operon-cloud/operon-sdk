@@ -11,7 +11,7 @@ This guide walks through the end-to-end flow for submitting a signed transaction
 ## 1. Install the SDK
 
 ```bash
-go get github.com/operon-cloud/operon-sdk/go@v1.0.0
+go get github.com/operon-cloud/operon-sdk/go@v1.2.1
 ```
 
 ## 2. Instantiate the client

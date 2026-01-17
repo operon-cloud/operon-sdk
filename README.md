@@ -378,7 +378,7 @@ The test suite uses `pytest` + `respx` to verify token refresh, self-signing, an
 To consume a specific version in Go, pin the tag:
 
 ```bash
-go get github.com/operon-cloud/operon-sdk/go@v1.0.0
+go get github.com/operon-cloud/operon-sdk/go@v1.2.1
 ```
 
 ---
