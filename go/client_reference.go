@@ -29,6 +29,10 @@ func (c *Client) Interactions(ctx context.Context) ([]InteractionSummary, error)
 		result = append(result, InteractionSummary{
 			ID:                  item.ID,
 			WorkstreamID:        item.WorkstreamID,
+			WorkstreamName:      item.WorkstreamName,
+			Name:                item.Name,
+			Description:         item.Description,
+			Status:              item.Status,
 			SourceParticipantID: item.SourceParticipantID,
 			TargetParticipantID: item.TargetParticipantID,
 			SourceDID:           item.SourceDID,
@@ -58,12 +62,13 @@ func (c *Client) Participants(ctx context.Context) ([]ParticipantSummary, error)
 	result := make([]ParticipantSummary, 0, len(items))
 	for _, item := range items {
 		result = append(result, ParticipantSummary{
-			ID:           item.ID,
-			DID:          item.DID,
-			Name:         item.Name,
-			Status:       item.Status,
-			CustomerID:   item.CustomerID,
-			WorkstreamID: item.WorkstreamID,
+			ID:             item.ID,
+			DID:            item.DID,
+			Name:           item.Name,
+			Status:         item.Status,
+			CustomerID:     item.CustomerID,
+			WorkstreamID:   item.WorkstreamID,
+			WorkstreamName: item.WorkstreamName,
 		})
 	}
 	return result, nil
@@ -243,6 +248,10 @@ func (c *Client) fetchInteractions(ctx context.Context, token string) ([]catalog
 		Data []struct {
 			ID                  string                    `json:"id"`
 			WorkstreamID        string                    `json:"workstreamId"`
+			WorkstreamName      string                    `json:"workstreamName"`
+			Name                string                    `json:"name"`
+			Description         string                    `json:"description"`
+			Status              string                    `json:"status"`
 			SourceParticipantID string                    `json:"sourceParticipantId"`
 			TargetParticipantID string                    `json:"targetParticipantId"`
 			Type                catalog.InteractionType   `json:"type"`
@@ -264,6 +273,10 @@ func (c *Client) fetchInteractions(ctx context.Context, token string) ([]catalog
 		result = append(result, catalog.Interaction{
 			ID:                  item.ID,
 			WorkstreamID:        item.WorkstreamID,
+			WorkstreamName:      item.WorkstreamName,
+			Name:                item.Name,
+			Description:         item.Description,
+			Status:              item.Status,
 			SourceParticipantID: item.SourceParticipantID,
 			TargetParticipantID: item.TargetParticipantID,
 			Type:                item.Type,
@@ -296,12 +309,13 @@ func (c *Client) fetchParticipants(ctx context.Context, token string) ([]catalog
 
 	var payload struct {
 		Data []struct {
-			ID           string `json:"id"`
-			DID          string `json:"did"`
-			Name         string `json:"name"`
-			Status       string `json:"status"`
-			CustomerID   string `json:"customerId"`
-			WorkstreamID string `json:"workstreamId"`
+			ID             string `json:"id"`
+			DID            string `json:"did"`
+			Name           string `json:"name"`
+			Status         string `json:"status"`
+			CustomerID     string `json:"customerId"`
+			WorkstreamID   string `json:"workstreamId"`
+			WorkstreamName string `json:"workstreamName"`
 		} `json:"data"`
 	}
 
@@ -316,12 +330,13 @@ func (c *Client) fetchParticipants(ctx context.Context, token string) ([]catalog
 			continue
 		}
 		result = append(result, catalog.Participant{
-			ID:           item.ID,
-			DID:          item.DID,
-			Name:         item.Name,
-			Status:       item.Status,
-			CustomerID:   item.CustomerID,
-			WorkstreamID: item.WorkstreamID,
+			ID:             item.ID,
+			DID:            item.DID,
+			Name:           item.Name,
+			Status:         item.Status,
+			CustomerID:     item.CustomerID,
+			WorkstreamID:   item.WorkstreamID,
+			WorkstreamName: item.WorkstreamName,
 		})
 	}
 	return result, nil

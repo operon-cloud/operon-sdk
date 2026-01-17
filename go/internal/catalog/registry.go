@@ -34,6 +34,10 @@ const (
 type Interaction struct {
 	ID                  string
 	WorkstreamID        string
+	WorkstreamName      string
+	Name                string
+	Description         string
+	Status              string
 	SourceParticipantID string
 	TargetParticipantID string
 	SourceDID           string
@@ -48,12 +52,13 @@ type Interaction struct {
 
 // Participant captures an ID to DID mapping for cached directory lookups.
 type Participant struct {
-	ID           string
-	DID          string
-	Name         string
-	Status       string
-	CustomerID   string
-	WorkstreamID string
+	ID             string
+	DID            string
+	Name           string
+	Status         string
+	CustomerID     string
+	WorkstreamID   string
+	WorkstreamName string
 }
 
 // Registry is a threadsafe cache for interaction and participant directories.

@@ -109,3 +109,12 @@ func TestNewClientCredentialsManagerValidation(t *testing.T) {
 func TestExtractParticipantDIDHandlesInvalidToken(t *testing.T) {
 	require.Equal(t, "", extractParticipantDID("invalid"))
 }
+
+func TestDecodeTokenClaimsFallsBackToChannelID(t *testing.T) {
+	claims := `{"channel_id":"chnl-123"}`
+	payload := base64.RawURLEncoding.EncodeToString([]byte(claims))
+	token := "header." + payload + ".signature"
+
+	decoded := DecodeTokenClaims(token)
+	require.Equal(t, "chnl-123", decoded.WorkstreamID)
+}

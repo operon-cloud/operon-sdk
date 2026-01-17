@@ -117,6 +117,10 @@ type TransactionRequest struct {
 type InteractionSummary struct {
 	ID                  string
 	WorkstreamID        string
+	WorkstreamName      string
+	Name                string
+	Description         string
+	Status              string
 	SourceParticipantID string
 	TargetParticipantID string
 	SourceDID           string
@@ -130,13 +134,74 @@ type InteractionSummary struct {
 }
 
 type ParticipantSummary struct {
-	ID           string
-	DID          string
-	Name         string
-	Status       string
-	CustomerID   string
-	WorkstreamID string
+	ID             string
+	DID            string
+	Name           string
+	Status         string
+	CustomerID     string
+	WorkstreamID   string
+	WorkstreamName string
 }
+
+// Workstream captures workstream configuration details returned by the client API.
+type Workstream struct {
+	ID             string            `json:"id"`
+	CreatedAt      time.Time         `json:"createdAt,omitempty"`
+	UpdatedAt      time.Time         `json:"updatedAt,omitempty"`
+	CreatedBy      string            `json:"createdBy,omitempty"`
+	UpdatedBy      string            `json:"updatedBy,omitempty"`
+	Version        int               `json:"version,omitempty"`
+	CustomerID     string            `json:"customerId,omitempty"`
+	WorkspaceID    string            `json:"workspaceId,omitempty"`
+	Name           string            `json:"name,omitempty"`
+	Description    string            `json:"description,omitempty"`
+	Mode           WorkstreamMode    `json:"mode,omitempty"`
+	Type           WorkstreamType    `json:"type,omitempty"`
+	Status         WorkstreamStatus  `json:"status,omitempty"`
+	States         []WorkstreamState `json:"states,omitempty"`
+	DefaultStateID string            `json:"defaultStateId,omitempty"`
+	InteractionIDs []string          `json:"interactionIds,omitempty"`
+	HCSTestTopicID string            `json:"hcsTestTopicId,omitempty"`
+	HCSLiveTopicID string            `json:"hcsLiveTopicId,omitempty"`
+}
+
+// WorkstreamState represents a user-managed transaction state within a workstream.
+type WorkstreamState struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Status string `json:"status,omitempty"`
+}
+
+// WorkstreamStatus describes the lifecycle status of a workstream.
+type WorkstreamStatus string
+
+const (
+	WorkstreamStatusDraft    WorkstreamStatus = "draft"
+	WorkstreamStatusActive   WorkstreamStatus = "active"
+	WorkstreamStatusInactive WorkstreamStatus = "inactive"
+	WorkstreamStatusArchived WorkstreamStatus = "archived"
+)
+
+// WorkstreamMode captures whether a workstream is enabled.
+type WorkstreamMode string
+
+const (
+	WorkstreamModeOff WorkstreamMode = "off"
+	WorkstreamModeOn  WorkstreamMode = "on"
+)
+
+// WorkstreamType mirrors workspace classifications for clarity.
+type WorkstreamType string
+
+const (
+	WorkstreamTypeInternal   WorkstreamType = "internal"
+	WorkstreamTypeProduction WorkstreamType = "production"
+)
+
+const (
+	WorkstreamStateStatusActive   = "active"
+	WorkstreamStateStatusInactive = "inactive"
+)
 
 // transactionSubmission mirrors the JSON payload expected by the client API for transaction creation.
 type transactionSubmission struct {

@@ -41,6 +41,29 @@ cfg := operon.WorkstreamDataConfig{
 resp, err := operon.FetchWorkstreamInteractions(ctx, cfg, patFromCookie)
 ```
 
+## Fetch workstream details
+
+```go
+workstream, err := client.GetWorkstream(ctx)
+if err != nil {
+    log.Fatalf("load workstream: %v", err)
+}
+
+log.Printf("%s (%s)", workstream.ID, workstream.Status)
+```
+
+The response includes status, mode, and state configuration so you can validate
+transaction state values before submitting new payloads.
+
+The PAT-based helper mirrors the same flow:
+
+```go
+workstream, err := operon.FetchWorkstream(ctx, cfg, patFromCookie)
+if err != nil {
+    log.Fatalf("load workstream: %v", err)
+}
+```
+
 ## Fetch workstream participants
 
 ```go
