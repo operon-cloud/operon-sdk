@@ -17,7 +17,7 @@ func TestValidateSessionSuccess(t *testing.T) {
 		"participant_id":  "prtp-123",
 		"client_id":       "client-123",
 		"azp":             "app-123",
-		"channel_id":      "chnl-123",
+		"workstream_id":   "chnl-123",
 		"customer_id":     "cust-123",
 		"workspace_id":    "wksp-123",
 		"session_id":      "sess-123",

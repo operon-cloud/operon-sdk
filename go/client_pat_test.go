@@ -72,7 +72,7 @@ func TestSignHashWithPATAPIFailure(t *testing.T) {
 func TestSubmitTransactionWithPATSuccess(t *testing.T) {
 	pat := newTokenWithClaims(map[string]any{
 		"participant_did": "did:example:source",
-		"channel_id":      "channel-123",
+		"workstream_id":   "channel-123",
 	})
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +87,7 @@ func TestSubmitTransactionWithPATSuccess(t *testing.T) {
 		require.NoError(t, json.Unmarshal(payloadBytes, &body))
 		_, hasPayloadData := body["payloadData"]
 		require.False(t, hasPayloadData, "payloadData must not be transmitted")
-		require.Equal(t, "channel-123", body["channelId"])
+		require.Equal(t, "channel-123", body["workstreamId"])
 		require.Equal(t, "interaction-xyz", body["interactionId"])
 		require.Equal(t, "did:example:source", body["sourceDid"])
 		require.Equal(t, "did:example:target", body["targetDid"])
@@ -96,7 +96,7 @@ func TestSubmitTransactionWithPATSuccess(t *testing.T) {
 		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 			"id":            "txn-123",
 			"correlationId": "corr-1",
-			"channelId":     "channel-123",
+			"workstreamId":  "channel-123",
 			"interactionId": "interaction-xyz",
 			"timestamp":     time.Now().UTC(),
 			"sourceDid":     "did:example:source",

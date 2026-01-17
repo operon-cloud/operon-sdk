@@ -27,7 +27,7 @@ type tokenResponse struct {
 
 type transactionSubmission struct {
 	CorrelationID string           `json:"correlationId"`
-	WorkstreamID  string           `json:"channelId"`
+	WorkstreamID  string           `json:"workstreamId"`
 	InteractionID string           `json:"interactionId"`
 	Timestamp     string           `json:"timestamp"`
 	SourceDID     string           `json:"sourceDid"`
@@ -83,7 +83,7 @@ func TestClientSubmitTransactionWithSelfSigning(t *testing.T) {
 				"data": []map[string]any{
 					{
 						"id":                  "interaction-xyz",
-						"channelId":           "channel-abc",
+						"workstreamId":        "channel-abc",
 						"sourceParticipantId": "participant-src",
 						"targetParticipantId": "participant-tgt",
 					},
@@ -132,7 +132,7 @@ func TestClientSubmitTransactionWithSelfSigning(t *testing.T) {
 			response := map[string]any{
 				"id":            "txn-123",
 				"correlationId": captured.CorrelationID,
-				"channelId":     captured.WorkstreamID,
+				"workstreamId":  captured.WorkstreamID,
 				"interactionId": captured.InteractionID,
 				"sourceDid":     captured.SourceDID,
 				"targetDid":     captured.TargetDID,
@@ -193,7 +193,7 @@ func TestClientSubmitTransactionWithManualSignature(t *testing.T) {
 				"data": []map[string]any{
 					{
 						"id":                  "manual-interaction",
-						"channelId":           "manual-channel",
+						"workstreamId":        "manual-channel",
 						"sourceParticipantId": "participant-src",
 						"targetParticipantId": "participant-tgt",
 					},
@@ -212,7 +212,7 @@ func TestClientSubmitTransactionWithManualSignature(t *testing.T) {
 			var body transactionSubmission
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 			require.Equal(t, "manual-signature", body.Signature.Value)
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "txn-456", "status": "received", "correlationId": body.CorrelationID, "channelId": body.WorkstreamID, "interactionId": body.InteractionID, "sourceDid": body.SourceDID, "targetDid": body.TargetDID, "timestamp": time.Now(), "createdAt": time.Now(), "updatedAt": time.Now(), "signature": map[string]any{"algorithm": body.Signature.Algorithm, "value": body.Signature.Value}}))
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "txn-456", "status": "received", "correlationId": body.CorrelationID, "workstreamId": body.WorkstreamID, "interactionId": body.InteractionID, "sourceDid": body.SourceDID, "targetDid": body.TargetDID, "timestamp": time.Now(), "createdAt": time.Now(), "updatedAt": time.Now(), "signature": map[string]any{"algorithm": body.Signature.Algorithm, "value": body.Signature.Value}}))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -499,7 +499,7 @@ func TestClientParticipantsReturnsCopy(t *testing.T) {
 				"data": []map[string]any{
 					{
 						"id":                  "interaction-abc",
-						"channelId":           "channel-abc",
+						"workstreamId":        "channel-abc",
 						"sourceParticipantId": "participant-src",
 						"targetParticipantId": "participant-tgt",
 					},
@@ -568,7 +568,7 @@ func TestReferenceFetchFailsWhenParticipantsFail(t *testing.T) {
 				"data": []map[string]any{
 					{
 						"id":                  "interaction-abc",
-						"channelId":           "channel-abc",
+						"workstreamId":        "channel-abc",
 						"sourceParticipantId": "participant-src",
 						"targetParticipantId": "participant-tgt",
 					},
@@ -606,7 +606,7 @@ func TestSubmitTransactionAddsKeyIDWhenMissing(t *testing.T) {
 				"data": []map[string]any{
 					{
 						"id":                  "interaction-xyz",
-						"channelId":           "channel-abc",
+						"workstreamId":        "channel-abc",
 						"sourceParticipantId": "participant-src",
 						"targetParticipantId": "participant-tgt",
 					},
@@ -637,7 +637,7 @@ func TestSubmitTransactionAddsKeyIDWhenMissing(t *testing.T) {
 				"id":            "txn-789",
 				"status":        "received",
 				"correlationId": body.CorrelationID,
-				"channelId":     body.WorkstreamID,
+				"workstreamId":  body.WorkstreamID,
 				"interactionId": body.InteractionID,
 				"sourceDid":     body.SourceDID,
 				"targetDid":     body.TargetDID,
@@ -735,7 +735,7 @@ func TestReferenceFetchFailsWhenParticipantDecodeFails(t *testing.T) {
 				"data": []map[string]any{
 					{
 						"id":                  "interaction-abc",
-						"channelId":           "channel-abc",
+						"workstreamId":        "channel-abc",
 						"sourceParticipantId": "participant-src",
 						"targetParticipantId": "participant-tgt",
 					},

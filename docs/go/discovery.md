@@ -25,10 +25,10 @@ Interactions may include workstream analytics metadata like `states`, `roiClassi
 If your credentials are scoped to multiple workstreams, provide an override:
 
 ```go
-resp, err := client.GetWorkstreamInteractions(ctx, "chnl-123")
+resp, err := client.GetWorkstreamInteractions(ctx, "wstr-123")
 ```
 
-The response mirrors `GET /v1/channels/{channelId}/interactions` from the client API and includes pagination fields should you need them (`totalCount`, `page`, `pageSize`, `hasMore`). The API still uses `channelId` in the path, even though the SDK surfaces workstreams.
+The response mirrors `GET /v1/workstreams/{workstreamId}/interactions` from the client API and includes pagination fields should you need them (`totalCount`, `page`, `pageSize`, `hasMore`).
 
 Server-side components that already hold a PAT (for example, sandbox-api after login) can stay SDK-only as well:
 
@@ -57,7 +57,7 @@ for _, participant := range resp.Participants {
 As with interactions, optional overrides let you query a different workstream:
 
 ```go
-resp, err := client.GetWorkstreamParticipants(ctx, "chnl-123")
+resp, err := client.GetWorkstreamParticipants(ctx, "wstr-123")
 ```
 
 Both helpers infer the PAT to send on the request, handle API error decoding, and keep the SDK’s workstream cache consistent. This keeps your service fully SDK-driven while aligning with Operon’s auth standards.

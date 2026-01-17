@@ -69,7 +69,7 @@ req := operon.TransactionRequest{
     StateLabel:    "Intake",
     ROIClassification: operon.ROIClassificationIncrement,
     ROICost:       25,
-    ROITime:       30,
+    ROITime:       30, // seconds
 }
 ```
 
@@ -79,7 +79,7 @@ Key points:
 - If you call `client.Init`, the SDK fills `WorkstreamID`, `SourceDID`, and `TargetDID` from the interaction cache. If you skip cache usage, provide them explicitly.
 - `CorrelationID` enforces idempotency. Choose a deterministic value per logical transaction.
 - `State`, `StateID`, and `StateLabel` are optional and align with workstream state/queue analytics.
-- `ROIClassification` with `ROICost` and `ROITime` are optional and record baseline, increment, or savings value metrics.
+- `ROIClassification` with `ROICost` and `ROITime` are optional and record baseline, increment, or savings value metrics (`ROITime` is in seconds).
 - `Actor` is defined on the interaction configuration; leave it unset in most cases. Only override it when you intentionally want per-transaction actor changes.
 
 ## 4. Submit the transaction

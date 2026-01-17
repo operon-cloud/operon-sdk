@@ -17,13 +17,14 @@ import (
 // WorkstreamInteraction represents a detailed interaction record associated with the authenticated workstream.
 type WorkstreamInteraction struct {
 	ID                  string            `json:"id"`
-	WorkstreamID        string            `json:"channelId"`
+	WorkstreamID        string            `json:"workstreamId"`
+	WorkstreamName      string            `json:"workstreamName,omitempty"`
 	Name                string            `json:"name,omitempty"`
 	Description         string            `json:"description,omitempty"`
 	Status              string            `json:"status,omitempty"`
 	SourceParticipantID string            `json:"sourceParticipantId,omitempty"`
 	TargetParticipantID string            `json:"targetParticipantId,omitempty"`
-	Workstreams         []string          `json:"channels,omitempty"`
+	Workstreams         []string          `json:"workstreams,omitempty"`
 	Type                InteractionType   `json:"type,omitempty"`
 	Actor               InteractionActor  `json:"actor,omitempty"`
 	States              []string          `json:"states,omitempty"`
@@ -36,7 +37,7 @@ type WorkstreamInteraction struct {
 	Version             int               `json:"version,omitempty"`
 }
 
-// WorkstreamInteractionsResponse mirrors the Client API payload for /v1/channels/{channelId}/interactions.
+// WorkstreamInteractionsResponse mirrors the Client API payload for /v1/workstreams/{workstreamId}/interactions.
 type WorkstreamInteractionsResponse struct {
 	Interactions []WorkstreamInteraction `json:"interactions"`
 	TotalCount   int                     `json:"totalCount"`
@@ -47,22 +48,23 @@ type WorkstreamInteractionsResponse struct {
 
 // WorkstreamParticipant represents a participant linked to the authenticated workstream.
 type WorkstreamParticipant struct {
-	ID           string    `json:"id"`
-	DID          string    `json:"did"`
-	Name         string    `json:"name,omitempty"`
-	Description  string    `json:"description,omitempty"`
-	URL          string    `json:"url,omitempty"`
-	Status       string    `json:"status,omitempty"`
-	Type         string    `json:"type,omitempty"`
-	CustomerID   string    `json:"customerId,omitempty"`
-	WorkstreamID string    `json:"channelId,omitempty"`
-	Tags         []string  `json:"tags,omitempty"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
-	Version      int       `json:"version,omitempty"`
+	ID             string    `json:"id"`
+	DID            string    `json:"did"`
+	Name           string    `json:"name,omitempty"`
+	Description    string    `json:"description,omitempty"`
+	URL            string    `json:"url,omitempty"`
+	Status         string    `json:"status,omitempty"`
+	Type           string    `json:"type,omitempty"`
+	CustomerID     string    `json:"customerId,omitempty"`
+	WorkstreamID   string    `json:"workstreamId,omitempty"`
+	WorkstreamName string    `json:"workstreamName,omitempty"`
+	Tags           []string  `json:"tags,omitempty"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
+	Version        int       `json:"version,omitempty"`
 }
 
-// WorkstreamParticipantsResponse mirrors the Client API payload for /v1/channels/{channelId}/participants.
+// WorkstreamParticipantsResponse mirrors the Client API payload for /v1/workstreams/{workstreamId}/participants.
 type WorkstreamParticipantsResponse struct {
 	Participants []WorkstreamParticipant `json:"participants"`
 	TotalCount   int                     `json:"totalCount"`
@@ -88,7 +90,7 @@ func (c *Client) GetWorkstreamInteractions(ctx context.Context, workstreamID ...
 		return WorkstreamInteractionsResponse{}, err
 	}
 
-	path := fmt.Sprintf("/v1/channels/%s/interactions", targetWorkstream)
+	path := fmt.Sprintf("/v1/workstreams/%s/interactions", targetWorkstream)
 	resp, err := c.authorizedJSONRequest(ctx, http.MethodGet, path, token, nil)
 	if err != nil {
 		return WorkstreamInteractionsResponse{}, err
@@ -128,7 +130,7 @@ func (c *Client) GetWorkstreamParticipants(ctx context.Context, workstreamID ...
 		return WorkstreamParticipantsResponse{}, err
 	}
 
-	path := fmt.Sprintf("/v1/channels/%s/participants", targetWorkstream)
+	path := fmt.Sprintf("/v1/workstreams/%s/participants", targetWorkstream)
 	resp, err := c.authorizedJSONRequest(ctx, http.MethodGet, path, token, nil)
 	if err != nil {
 		return WorkstreamParticipantsResponse{}, err
@@ -212,7 +214,7 @@ func fetchWorkstreamDataset(ctx context.Context, cfg WorkstreamDataConfig, pat s
 		return nil, err
 	}
 
-	endpoint := fmt.Sprintf("%s/v1/channels/%s/%s", normalized.BaseURL, url.PathEscape(workstream), resource)
+	endpoint := fmt.Sprintf("%s/v1/workstreams/%s/%s", normalized.BaseURL, url.PathEscape(workstream), resource)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)

@@ -55,7 +55,8 @@ type Signature struct {
 type Transaction struct {
 	ID                    string            `json:"id"`
 	CorrelationID         string            `json:"correlationId"`
-	WorkstreamID          string            `json:"channelId"`
+	WorkstreamID          string            `json:"workstreamId"`
+	WorkstreamName        string            `json:"workstreamName,omitempty"`
 	CustomerID            string            `json:"customerId,omitempty"`
 	WorkspaceID           string            `json:"workspaceId,omitempty"`
 	InteractionID         string            `json:"interactionId"`
@@ -91,7 +92,7 @@ type Transaction struct {
 // TransactionRequest captures the payload submitted by SDK callers.
 type TransactionRequest struct {
 	CorrelationID     string            `json:"correlationId"`
-	WorkstreamID      string            `json:"channelId,omitempty"`
+	WorkstreamID      string            `json:"workstreamId,omitempty"`
 	InteractionID     string            `json:"interactionId"`
 	Timestamp         time.Time         `json:"timestamp,omitempty"`
 	SourceDID         string            `json:"sourceDid,omitempty"`
@@ -140,7 +141,7 @@ type ParticipantSummary struct {
 // transactionSubmission mirrors the JSON payload expected by the client API for transaction creation.
 type transactionSubmission struct {
 	CorrelationID     string            `json:"correlationId"`
-	WorkstreamID      string            `json:"channelId"`
+	WorkstreamID      string            `json:"workstreamId"`
 	InteractionID     string            `json:"interactionId"`
 	Timestamp         string            `json:"timestamp"`
 	SourceDID         string            `json:"sourceDid"`

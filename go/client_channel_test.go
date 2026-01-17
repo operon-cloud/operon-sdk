@@ -16,7 +16,7 @@ import (
 func TestClientGetWorkstreamInteractionsUsesTokenWorkstream(t *testing.T) {
 	tokenValue := newTokenWithClaims(map[string]any{
 		"participant_did": "did:example:source",
-		"channel_id":      "channel-abc",
+		"workstream_id":   "channel-abc",
 	})
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +24,7 @@ func TestClientGetWorkstreamInteractionsUsesTokenWorkstream(t *testing.T) {
 		case "/token":
 			resp := tokenResponse{AccessToken: tokenValue, TokenType: "Bearer", ExpiresIn: 3600}
 			require.NoError(t, json.NewEncoder(w).Encode(resp))
-		case "/v1/channels/channel-abc/interactions":
+		case "/v1/workstreams/channel-abc/interactions":
 			require.Equal(t, http.MethodGet, r.Method)
 			require.Equal(t, "Bearer "+tokenValue, r.Header.Get("Authorization"))
 			payload := operon.WorkstreamInteractionsResponse{
@@ -70,7 +70,7 @@ func TestClientGetWorkstreamParticipantsAllowsOverride(t *testing.T) {
 		case "/token":
 			resp := tokenResponse{AccessToken: tokenValue, TokenType: "Bearer", ExpiresIn: 3600}
 			require.NoError(t, json.NewEncoder(w).Encode(resp))
-		case "/v1/channels/channel-override/participants":
+		case "/v1/workstreams/channel-override/participants":
 			require.Equal(t, http.MethodGet, r.Method)
 			require.Equal(t, "Bearer "+tokenValue, r.Header.Get("Authorization"))
 			payload := operon.WorkstreamParticipantsResponse{
@@ -135,11 +135,11 @@ func TestClientGetWorkstreamInteractionsErrorsWithoutWorkstream(t *testing.T) {
 func TestFetchWorkstreamInteractionsUsesPATClaim(t *testing.T) {
 	pat := newTokenWithClaims(map[string]any{
 		"participant_did": "did:example:source",
-		"channel_id":      "channel-xyz",
+		"workstream_id":   "channel-xyz",
 	})
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "/v1/channels/channel-xyz/interactions", r.URL.Path)
+		require.Equal(t, "/v1/workstreams/channel-xyz/interactions", r.URL.Path)
 		require.Equal(t, http.MethodGet, r.Method)
 		require.Equal(t, "Bearer "+pat, r.Header.Get("Authorization"))
 
@@ -179,7 +179,7 @@ func TestFetchWorkstreamParticipantsAllowsOverride(t *testing.T) {
 	pat := newTokenWithoutParticipantDID()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "/v1/channels/channel-override/participants", r.URL.Path)
+		require.Equal(t, "/v1/workstreams/channel-override/participants", r.URL.Path)
 		require.Equal(t, http.MethodGet, r.Method)
 		require.Equal(t, "Bearer "+pat, r.Header.Get("Authorization"))
 

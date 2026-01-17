@@ -222,21 +222,22 @@ type tokenResponse struct {
 
 // Claims captures token fields used across the SDK.
 type Claims struct {
-	ParticipantDID  string   `json:"participant_did"`
-	WorkstreamID    string   `json:"channel_id"`
-	CustomerID      string   `json:"customer_id"`
-	WorkspaceID     string   `json:"workspace_id"`
-	Email           string   `json:"email"`
-	Name            string   `json:"name"`
-	TenantIDs       []string `json:"tenant_ids"`
-	Roles           []string `json:"roles"`
-	MemberID        string   `json:"member_id"`
-	SessionID       string   `json:"session_id"`
-	OrgID           string   `json:"org_id"`
-	ParticipantID   string   `json:"participant_id"`
-	ClientID        string   `json:"client_id"`
-	AuthorizedParty string   `json:"azp"`
-	ExpiresAt       int64    `json:"exp"`
+	ParticipantDID     string   `json:"participant_did"`
+	WorkstreamID       string   `json:"workstream_id"`
+	WorkstreamIDLegacy string   `json:"channel_id"`
+	CustomerID         string   `json:"customer_id"`
+	WorkspaceID        string   `json:"workspace_id"`
+	Email              string   `json:"email"`
+	Name               string   `json:"name"`
+	TenantIDs          []string `json:"tenant_ids"`
+	Roles              []string `json:"roles"`
+	MemberID           string   `json:"member_id"`
+	SessionID          string   `json:"session_id"`
+	OrgID              string   `json:"org_id"`
+	ParticipantID      string   `json:"participant_id"`
+	ClientID           string   `json:"client_id"`
+	AuthorizedParty    string   `json:"azp"`
+	ExpiresAt          int64    `json:"exp"`
 }
 
 // DecodeTokenClaims decodes the JWT payload and returns known Operon claims.
@@ -261,6 +262,9 @@ func DecodeTokenClaims(token string) Claims {
 	var claims Claims
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return Claims{}
+	}
+	if claims.WorkstreamID == "" {
+		claims.WorkstreamID = claims.WorkstreamIDLegacy
 	}
 	return claims
 }

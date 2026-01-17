@@ -242,7 +242,7 @@ func (c *Client) fetchInteractions(ctx context.Context, token string) ([]catalog
 	var payload struct {
 		Data []struct {
 			ID                  string                    `json:"id"`
-			WorkstreamID        string                    `json:"channelId"`
+			WorkstreamID        string                    `json:"workstreamId"`
 			SourceParticipantID string                    `json:"sourceParticipantId"`
 			TargetParticipantID string                    `json:"targetParticipantId"`
 			Type                catalog.InteractionType   `json:"type"`
@@ -301,7 +301,7 @@ func (c *Client) fetchParticipants(ctx context.Context, token string) ([]catalog
 			Name         string `json:"name"`
 			Status       string `json:"status"`
 			CustomerID   string `json:"customerId"`
-			WorkstreamID string `json:"channelId"`
+			WorkstreamID string `json:"workstreamId"`
 		} `json:"data"`
 	}
 

@@ -37,7 +37,7 @@ func newResponse(status int, body string) *http.Response {
 }
 
 func TestClientCredentialsManagerCachesTokens(t *testing.T) {
-	claims := `{"participant_did":"did:example:source","channel_id":"chnl-123","customer_id":"cust-456","workspace_id":"wksp-789","email":"user@example.com","name":"Example User","tenant_ids":["tenant-1","tenant-2"],"roles":["role-admin"],"member_id":"member-1","session_id":"session-1","org_id":"org-1"}`
+	claims := `{"participant_did":"did:example:source","workstream_id":"chnl-123","customer_id":"cust-456","workspace_id":"wksp-789","email":"user@example.com","name":"Example User","tenant_ids":["tenant-1","tenant-2"],"roles":["role-admin"],"member_id":"member-1","session_id":"session-1","org_id":"org-1"}`
 	payload := base64.RawURLEncoding.EncodeToString([]byte(claims))
 	body := fmt.Sprintf(`{"access_token":"header.%s.signature","token_type":"Bearer","expires_in":3600}`, payload)
 	mock := &mockDoer{responses: []*http.Response{newResponse(http.StatusOK, body)}}
