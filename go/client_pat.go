@@ -158,7 +158,6 @@ func SubmitTransactionWithPAT(ctx context.Context, cfg ClientAPIConfig, pat stri
 		Timestamp:         timestamp.Format(time.RFC3339Nano),
 		SourceDID:         req.SourceDID,
 		TargetDID:         req.TargetDID,
-		Actor:             req.Actor,
 		ROIClassification: req.ROIClassification,
 		ROICost:           req.ROICost,
 		ROITime:           req.ROITime,

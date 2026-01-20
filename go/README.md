@@ -96,7 +96,7 @@ With an initialised client you can choose the scenario that matches your workloa
 
 Both guides include full code samples, error-handling tips, and troubleshooting checklists.
 
-`TransactionRequest` also supports optional analytics fields (`State`, `StateID`, `StateLabel`, `ROIClassification`, `ROICost`, `ROITime`) to align submissions with value metrics and queue tracking. `Actor` is typically defined on the interaction and left unset per transaction; see the transactions guide for minimal vs advanced examples.
+`TransactionRequest` also supports optional analytics fields (`State`, `StateID`, `StateLabel`, `ROIClassification`, `ROICost`, `ROITime`) to align submissions with value metrics and queue tracking.
 
 ## Session keep-alive & token refresh
 

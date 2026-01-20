@@ -63,7 +63,6 @@ type Transaction struct {
 	Timestamp             time.Time         `json:"timestamp"`
 	SourceDID             string            `json:"sourceDid"`
 	TargetDID             string            `json:"targetDid"`
-	Actor                 InteractionActor  `json:"actor,omitempty"`
 	State                 string            `json:"state,omitempty"`
 	StateID               string            `json:"stateId,omitempty"`
 	StateLabel            string            `json:"stateLabel,omitempty"`
@@ -97,7 +96,6 @@ type TransactionRequest struct {
 	Timestamp         time.Time         `json:"timestamp,omitempty"`
 	SourceDID         string            `json:"sourceDid,omitempty"`
 	TargetDID         string            `json:"targetDid,omitempty"`
-	Actor             InteractionActor  `json:"actor,omitempty"`
 	ROIClassification ROIClassification `json:"roiClassification,omitempty"`
 	ROICost           int               `json:"roiCost,omitempty"`
 	ROITime           int               `json:"roiTime,omitempty"`
@@ -211,7 +209,6 @@ type transactionSubmission struct {
 	Timestamp         string            `json:"timestamp"`
 	SourceDID         string            `json:"sourceDid"`
 	TargetDID         string            `json:"targetDid"`
-	Actor             InteractionActor  `json:"actor,omitempty"`
 	ROIClassification ROIClassification `json:"roiClassification,omitempty"`
 	ROICost           int               `json:"roiCost,omitempty"`
 	ROITime           int               `json:"roiTime,omitempty"`

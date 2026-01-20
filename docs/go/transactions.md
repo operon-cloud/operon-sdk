@@ -80,7 +80,6 @@ Key points:
 - `CorrelationID` enforces idempotency. Choose a deterministic value per logical transaction.
 - `State`, `StateID`, and `StateLabel` are optional and align with workstream state/queue analytics.
 - `ROIClassification` with `ROICost` and `ROITime` are optional and record baseline, increment, or savings value metrics (`ROITime` is in seconds).
-- `Actor` is defined on the interaction configuration; leave it unset in most cases. Only override it when you intentionally want per-transaction actor changes.
 
 ## 4. Submit the transaction
 
