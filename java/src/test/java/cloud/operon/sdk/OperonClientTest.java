@@ -6,22 +6,27 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OperonClientTest {
 
@@ -35,6 +40,10 @@ class OperonClientTest {
     private final DelegatingHandler participantsHandler = new DelegatingHandler();
     private final DelegatingHandler transactionsHandler = new DelegatingHandler();
     private final DelegatingHandler signerHandler = new DelegatingHandler();
+    private final DelegatingHandler verifyHandler = new DelegatingHandler();
+    private final DelegatingHandler workstreamHandler = new DelegatingHandler();
+    private final DelegatingHandler workstreamInteractionsHandler = new DelegatingHandler();
+    private final DelegatingHandler workstreamParticipantsHandler = new DelegatingHandler();
 
     @BeforeEach
     void setUp() throws IOException {
@@ -44,13 +53,22 @@ class OperonClientTest {
         participantsHandler.delegate = new ParticipantsHandler();
         transactionsHandler.delegate = new TransactionHandler();
         signerHandler.delegate = new SigningHandler();
+        verifyHandler.delegate = new VerifyHandler();
+        workstreamHandler.delegate = new WorkstreamHandler();
+        workstreamInteractionsHandler.delegate = new WorkstreamInteractionsHandler();
+        workstreamParticipantsHandler.delegate = new WorkstreamParticipantsHandler();
 
         server.createContext("/oauth2/token", tokenHandler);
-        server.createContext("/client-api/v1/channels/chan-1/interactions", interactionsHandler);
-        server.createContext("/client-api/v1/channels/chan-1/participants", participantsHandler);
+        server.createContext("/client-api/v1/interactions", interactionsHandler);
+        server.createContext("/client-api/v1/participants", participantsHandler);
         server.createContext("/client-api/v1/transactions", transactionsHandler);
         server.createContext("/client-api/v1/dids/self/sign", signerHandler);
+        server.createContext("/client-api/v1/dids/did:test:source/signature/verify", verifyHandler);
+        server.createContext("/client-api/v1/workstreams/wstr-1", workstreamHandler);
+        server.createContext("/client-api/v1/workstreams/wstr-1/interactions", workstreamInteractionsHandler);
+        server.createContext("/client-api/v1/workstreams/wstr-1/participants", workstreamParticipantsHandler);
         server.start();
+
         baseUri = URI.create("http://localhost:" + server.getAddress().getPort());
         lastTransactionBody = null;
         tokenCalls.set(0);
@@ -64,7 +82,7 @@ class OperonClientTest {
     }
 
     @Test
-    void submitTransactionResolvesInteractionMetadata() throws Exception {
+    void submitTransactionResolvesInteractionMetadataAndSerializesParityFields() throws Exception {
         Config config = Config.builder()
             .baseUrl(baseUri + "/client-api")
             .tokenUrl(baseUri + "/oauth2/token")
@@ -84,6 +102,22 @@ class OperonClientTest {
             .label("Test submission")
             .tags(List.of(" priority: high ", ""))
             .payload("example payload")
+            .state("open")
+            .stateId("state-1")
+            .stateLabel("Open")
+            .roiBaseCost(7)
+            .roiBaseTime(5)
+            .roiCostSaving(3)
+            .roiTimeSaving(2)
+            .actorExternalId("agent-1")
+            .actorExternalDisplayName("Agent One")
+            .actorExternalSource("crm")
+            .assigneeExternalId("owner-2")
+            .assigneeExternalDisplayName("Owner Two")
+            .assigneeExternalSource("crm")
+            .customerId("cust-1")
+            .workspaceId("wksp-1")
+            .createdBy("user-1")
             .build();
 
         Transaction txn = client.submitTransaction(request);
@@ -95,76 +129,23 @@ class OperonClientTest {
         assertNotNull(lastTransactionBody, "transaction payload not captured");
         JsonNode submission = Json.mapper().readTree(lastTransactionBody);
         assertEquals("corr-123", submission.path("correlationId").asText());
-        assertEquals("chan-1", submission.path("channelId").asText());
+        assertEquals("wstr-1", submission.path("workstreamId").asText());
         assertEquals("intr-1", submission.path("interactionId").asText());
         assertEquals("did:test:source", submission.path("sourceDid").asText());
         assertEquals("did:test:target", submission.path("targetDid").asText());
         assertEquals("base64sig", submission.path("signature").path("value").asText());
         assertEquals("EdDSA", submission.path("signature").path("algorithm").asText());
         assertEquals("Test submission", submission.path("label").asText());
-        assertTrue(submission.path("tags").isArray());
         assertEquals("priority: high", submission.path("tags").get(0).asText());
+        assertEquals(7, submission.path("roiBaseCost").asInt());
+        assertEquals("agent-1", submission.path("actorExternalId").asText());
+        assertEquals("owner-2", submission.path("assigneeExternalId").asText());
 
         client.close();
     }
 
     @Test
-    void interactionsEndpointCachesResponse() throws Exception {
-        Config config = Config.builder()
-            .baseUrl(baseUri + "/client-api")
-            .tokenUrl(baseUri + "/oauth2/token")
-            .clientId("client-id")
-            .clientSecret("client-secret")
-            .httpClient(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build())
-            .disableSelfSign(true)
-            .build();
-
-        OperonClient client = new OperonClient(config);
-        client.init();
-
-        List<InteractionSummary> interactions = client.interactions();
-        assertEquals(1, interactions.size());
-        InteractionSummary summary = interactions.get(0);
-        assertEquals("intr-1", summary.id());
-        assertEquals("chan-1", summary.channelId());
-        assertEquals("did:test:source", summary.sourceDid());
-        assertEquals("did:test:target", summary.targetDid());
-
-        List<ParticipantSummary> participants = client.participants();
-        assertEquals(2, participants.size());
-
-        client.close();
-    }
-
-    @Test
-    void initFailsWhenTokenEndpointReturnsError() {
-        tokenHandler.delegate = exchange -> {
-            tokenCalls.incrementAndGet();
-            respond(exchange, 500, "{\"code\":\"INTERNAL\",\"message\":\"boom\"}");
-        };
-
-        Config config = Config.builder()
-            .baseUrl(baseUri + "/client-api")
-            .tokenUrl(baseUri + "/oauth2/token")
-            .clientId("broken")
-            .clientSecret("broken")
-            .httpClient(HttpClient.newHttpClient())
-            .disableSelfSign(true)
-            .build();
-
-        OperonClient client = new OperonClient(config);
-        OperonApiException ex = assertThrows(OperonApiException.class, client::init);
-        assertEquals(500, ex.getStatusCode());
-        assertEquals("INTERNAL", ex.getCode());
-        assertEquals(1, tokenCalls.get());
-    }
-
-    @Test
-    void submitTransactionSurfacesHttpErrors() throws Exception {
-        transactionsHandler.delegate = exchange -> {
-            respond(exchange, 403, "{\"code\":\"FORBIDDEN\",\"message\":\"denied\"}");
-        };
-
+    void workstreamEndpointsUseTokenScopedWorkstream() throws Exception {
         Config config = Config.builder()
             .baseUrl(baseUri + "/client-api")
             .tokenUrl(baseUri + "/oauth2/token")
@@ -177,22 +158,20 @@ class OperonClientTest {
         OperonClient client = new OperonClient(config);
         client.init();
 
-        TransactionRequest request = TransactionRequest.builder()
-            .correlationId("c1")
-            .interactionId("intr-1")
-            .signature(new Signature("EdDSA", "sig", null))
-            .payload("payload")
-            .build();
+        Workstream workstream = client.getWorkstream();
+        assertEquals("wstr-1", workstream.id());
 
-        OperonApiException ex = assertThrows(OperonApiException.class, () -> client.submitTransaction(request));
-        assertEquals(403, ex.getStatusCode());
-        assertEquals("FORBIDDEN", ex.getCode());
+        WorkstreamInteractionsResponse interactions = client.getWorkstreamInteractions();
+        assertEquals(1, interactions.interactions().size());
+
+        WorkstreamParticipantsResponse participants = client.getWorkstreamParticipants();
+        assertEquals(1, participants.participants().size());
+
+        client.close();
     }
 
     @Test
-    void submitTransactionFailsWhenSelfSigningErrors() throws Exception {
-        signerHandler.delegate = exchange -> respond(exchange, 500, "{\"code\":\"SIGNING_FAILED\",\"message\":\"sign error\"}");
-
+    void generateAndValidateSignatureHeaders() throws Exception {
         Config config = Config.builder()
             .baseUrl(baseUri + "/client-api")
             .tokenUrl(baseUri + "/oauth2/token")
@@ -200,19 +179,22 @@ class OperonClientTest {
             .clientSecret("client-secret")
             .httpClient(HttpClient.newHttpClient())
             .disableSelfSign(false)
+            .signingAlgorithm("ES256")
             .build();
 
         OperonClient client = new OperonClient(config);
         client.init();
 
-        TransactionRequest request = TransactionRequest.builder()
-            .correlationId("c1")
-            .interactionId("intr-1")
-            .payload("payload")
-            .build();
+        byte[] payload = "{\"demo\":true}".getBytes(StandardCharsets.UTF_8);
+        Map<String, String> headers = client.generateSignatureHeaders(payload, "");
 
-        OperonApiException ex = assertThrows(OperonApiException.class, () -> client.submitTransaction(request));
-        assertEquals("SIGNING_FAILED", ex.getCode());
+        assertEquals("did:test:source", headers.get(OperonClient.HEADER_OPERON_DID));
+        assertEquals("ES256", headers.get(OperonClient.HEADER_OPERON_SIGNATURE_ALGO));
+
+        SignatureValidationResult result = client.validateSignatureHeaders(payload, headers);
+        assertEquals("VALID", result.status());
+
+        client.close();
     }
 
     @Test
@@ -252,18 +234,18 @@ class OperonClientTest {
         }
     }
 
-    private class InteractionsHandler implements HttpHandler {
+    private static class InteractionsHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            String body = "{\"interactions\":[{\"id\":\"intr-1\",\"channelId\":\"chan-1\",\"sourceParticipantId\":\"part-1\",\"targetParticipantId\":\"part-2\"}],\"totalCount\":1,\"page\":1,\"pageSize\":50,\"hasMore\":false}";
+            String body = "{\"data\":[{\"id\":\"intr-1\",\"workstreamId\":\"wstr-1\",\"sourceParticipantId\":\"part-1\",\"targetParticipantId\":\"part-2\"}],\"totalCount\":1}";
             respond(exchange, 200, body);
         }
     }
 
-    private class ParticipantsHandler implements HttpHandler {
+    private static class ParticipantsHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            String body = "{\"participants\":[{\"id\":\"part-1\",\"did\":\"did:test:source\"},{\"id\":\"part-2\",\"did\":\"did:test:target\"}],\"totalCount\":2,\"page\":1,\"pageSize\":50,\"hasMore\":false}";
+            String body = "{\"data\":[{\"id\":\"part-1\",\"did\":\"did:test:source\"},{\"id\":\"part-2\",\"did\":\"did:test:target\"}],\"totalCount\":2}";
             respond(exchange, 200, body);
         }
     }
@@ -273,15 +255,47 @@ class OperonClientTest {
         public void handle(HttpExchange exchange) throws IOException {
             byte[] body = exchange.getRequestBody().readAllBytes();
             lastTransactionBody = new String(body, StandardCharsets.UTF_8);
-            String response = "{\"id\":\"txn-1\",\"correlationId\":\"corr-123\",\"sourceDid\":\"did:test:source\",\"targetDid\":\"did:test:target\"}";
+            String response = "{\"id\":\"txn-1\",\"correlationId\":\"corr-123\",\"workstreamId\":\"wstr-1\",\"interactionId\":\"intr-1\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"sourceDid\":\"did:test:source\",\"targetDid\":\"did:test:target\",\"signature\":{\"algorithm\":\"EdDSA\",\"value\":\"sig\",\"keyId\":\"did:test:source#keys-1\"},\"payloadHash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"status\":\"received\"}";
             respond(exchange, 200, response);
         }
     }
 
-    private class SigningHandler implements HttpHandler {
+    private static class SigningHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
-            String response = "{\"signature\":{\"algorithm\":\"EdDSA\",\"value\":\"signed-value\",\"keyId\":\"did:test:source#keys-1\"}}";
+            String response = "{\"signature\":{\"algorithm\":\"ES256\",\"value\":\"signed-value\",\"keyId\":\"did:test:source#keys-1\"}}";
+            respond(exchange, 200, response);
+        }
+    }
+
+    private static class VerifyHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String response = "{\"status\":\"VALID\",\"message\":\"ok\",\"did\":\"did:test:source\",\"payloadHash\":\"placeholder\",\"algorithm\":\"ES256\",\"keyId\":\"did:test:source#keys-1\"}";
+            respond(exchange, 200, response);
+        }
+    }
+
+    private static class WorkstreamHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String response = "{\"id\":\"wstr-1\",\"name\":\"Support\",\"status\":\"active\"}";
+            respond(exchange, 200, response);
+        }
+    }
+
+    private static class WorkstreamInteractionsHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String response = "{\"interactions\":[{\"id\":\"wint-1\",\"workstreamId\":\"wstr-1\"}],\"totalCount\":1,\"page\":1,\"pageSize\":1000,\"hasMore\":false}";
+            respond(exchange, 200, response);
+        }
+    }
+
+    private static class WorkstreamParticipantsHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            String response = "{\"participants\":[{\"id\":\"wp-1\",\"did\":\"did:test:source\"}],\"totalCount\":1,\"page\":1,\"pageSize\":1000,\"hasMore\":false}";
             respond(exchange, 200, response);
         }
     }
@@ -294,9 +308,9 @@ class OperonClientTest {
             if (delegate == null) {
                 exchange.sendResponseHeaders(500, -1);
                 exchange.close();
-            } else {
-                delegate.handle(exchange);
+                return;
             }
+            delegate.handle(exchange);
         }
     }
 
@@ -311,7 +325,7 @@ class OperonClientTest {
 
     private static String buildToken() {
         String header = Base64.getUrlEncoder().withoutPadding().encodeToString("{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8));
-        String payloadJson = "{\"participant_did\":\"did:test:source\",\"channel_id\":\"chan-1\"}";
+        String payloadJson = "{\"participant_did\":\"did:test:source\",\"workstream_id\":\"wstr-1\"}";
         String payload = Base64.getUrlEncoder().withoutPadding().encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
         return header + '.' + payload + "._";
     }

@@ -11,7 +11,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 
 > **SDK Coverage**  
 > ✅ Go (1.3.0)  
-> ✅ Java (1.0.1)  
+> ✅ Java (1.3.0)  
 > ✅ Node.js (1.0.1)  
 > ✅ .NET (1.0.1)  
 > ✅ Rust (1.0.1)  
@@ -125,7 +125,7 @@ Add the dependency to your Maven project:
 <dependency>
   <groupId>cloud.operon</groupId>
   <artifactId>operon-sdk</artifactId>
-  <version>1.0.0</version>
+  <version>1.3.0</version>
 </dependency>
 ```
 
@@ -133,7 +133,7 @@ Or with Gradle (Kotlin DSL):
 
 ```kotlin
 dependencies {
-    implementation("cloud.operon:operon-sdk:1.0.0")
+    implementation("cloud.operon:operon-sdk:1.3.0")
 }
 ```
 

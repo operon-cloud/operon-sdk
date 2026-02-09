@@ -138,20 +138,24 @@ public final class ClientCredentialsManager implements TokenProvider {
             }
             Instant expiry = Instant.now().plusSeconds(expiresIn);
 
-            TokenClaims claims = TokenClaims.from(accessToken);
+            DecodedClaims claims = DecodedClaims.decode(accessToken);
             return new Token(
                 accessToken,
-                claims.participantDid,
-                claims.channelId,
-                claims.customerId,
-                claims.workspaceId,
-                claims.email,
-                claims.name,
-                claims.tenantIds,
-                claims.roles,
-                claims.memberId,
-                claims.sessionId,
-                claims.orgId,
+                claims.participantDid(),
+                claims.workstreamId(),
+                claims.customerId(),
+                claims.workspaceId(),
+                claims.email(),
+                claims.name(),
+                claims.tenantIds(),
+                claims.roles(),
+                claims.memberId(),
+                claims.sessionId(),
+                claims.orgId(),
+                claims.participantId(),
+                claims.clientId(),
+                claims.authorizedParty(),
+                claims.expiresAtUnix(),
                 expiry
             );
         } catch (IOException ex) {
@@ -159,7 +163,7 @@ public final class ClientCredentialsManager implements TokenProvider {
         }
     }
 
-    private HttpRequest modernRequest() throws IOException {
+    private HttpRequest modernRequest() {
         StringBuilder form = new StringBuilder("grant_type=client_credentials");
         if (scope != null && !scope.isBlank()) {
             form.append("&scope=").append(URLEncoder.encode(scope, StandardCharsets.UTF_8));
@@ -192,7 +196,15 @@ public final class ClientCredentialsManager implements TokenProvider {
             body.put("scope", scope);
         }
         if (!audience.isEmpty()) {
-            body.put("audience", new ArrayList<>(audience));
+            List<String> trimmedAudience = new ArrayList<>();
+            for (String value : audience) {
+                if (value != null && !value.isBlank()) {
+                    trimmedAudience.add(value.trim());
+                }
+            }
+            if (!trimmedAudience.isEmpty()) {
+                body.put("audience", trimmedAudience);
+            }
         }
 
         byte[] json = Json.mapper().writeValueAsBytes(body);
@@ -202,101 +214,5 @@ public final class ClientCredentialsManager implements TokenProvider {
             .header("Content-Type", "application/json")
             .timeout(requestTimeout)
             .build();
-    }
-
-    private static final class TokenClaims {
-        private final String participantDid;
-        private final String channelId;
-        private final String customerId;
-        private final String workspaceId;
-        private final String email;
-        private final String name;
-        private final List<String> tenantIds;
-        private final List<String> roles;
-        private final String memberId;
-        private final String sessionId;
-        private final String orgId;
-
-        private TokenClaims(
-            String participantDid,
-            String channelId,
-            String customerId,
-            String workspaceId,
-            String email,
-            String name,
-            List<String> tenantIds,
-            List<String> roles,
-            String memberId,
-            String sessionId,
-            String orgId
-        ) {
-            this.participantDid = participantDid;
-            this.channelId = channelId;
-            this.customerId = customerId;
-            this.workspaceId = workspaceId;
-            this.email = email;
-            this.name = name;
-            this.tenantIds = tenantIds;
-            this.roles = roles;
-            this.memberId = memberId;
-            this.sessionId = sessionId;
-            this.orgId = orgId;
-        }
-
-        private static TokenClaims from(String token) {
-            try {
-                String[] parts = token.split("\\.");
-                if (parts.length < 2) {
-                    return empty();
-                }
-                byte[] payload = decodeBase64(parts[1]);
-                JsonNode node = Json.mapper().readTree(payload);
-                return new TokenClaims(
-                    node.path("participant_did").asText(null),
-                    node.path("channel_id").asText(null),
-                    node.path("customer_id").asText(null),
-                    node.path("workspace_id").asText(null),
-                    node.path("email").asText(null),
-                    node.path("name").asText(null),
-                    readArray(node, "tenant_ids"),
-                    readArray(node, "roles"),
-                    node.path("member_id").asText(null),
-                    node.path("session_id").asText(null),
-                    node.path("org_id").asText(null)
-                );
-            } catch (IOException ex) {
-                return empty();
-            }
-        }
-
-        private static List<String> readArray(JsonNode node, String field) {
-            JsonNode arr = node.path(field);
-            if (!arr.isArray()) {
-                return Collections.emptyList();
-            }
-            List<String> items = new ArrayList<>();
-            arr.forEach(item -> {
-                if (item.isTextual()) {
-                    String value = item.asText();
-                    if (!value.isBlank()) {
-                        items.add(value);
-                    }
-                }
-            });
-            return Collections.unmodifiableList(items);
-        }
-
-        private static byte[] decodeBase64(String value) {
-            try {
-                return Base64.getUrlDecoder().decode(value);
-            } catch (IllegalArgumentException ex) {
-                return Base64.getDecoder().decode(value);
-            }
-        }
-
-        private static TokenClaims empty() {
-            return new TokenClaims(null, null, null, null, null, null,
-                Collections.emptyList(), Collections.emptyList(), null, null, null);
-        }
     }
 }

@@ -41,3 +41,27 @@ All notable SDK changes are documented in this file.
   - `fetch_workstream`, `fetch_workstream_interactions`, `fetch_workstream_participants`
 - Added `validate_session` helper parity for PAT session validation flows.
 - Updated Python docs and examples to reflect the current API surface.
+
+### Java SDK
+
+- Upgraded Java SDK to functional parity with Go `v1.3.0`.
+- Migrated SDK terminology and endpoints to workstream-era APIs while preserving channel compatibility aliases:
+  - reference catalogue now loads from `/v1/interactions` and `/v1/participants`
+  - workstream APIs now support `/v1/workstreams/{workstreamId}/...`
+- Expanded transaction request/response models with parity fields:
+  - actor/assignee attribution (`actorExternal*`, `assigneeExternal*`)
+  - state fields (`state`, `stateId`, `stateLabel`)
+  - ROI compatibility fields (`roiBaseCost`, `roiBaseTime`, `roiCostSaving`, `roiTimeSaving`)
+  - context fields (`customerId`, `workspaceId`, `createdBy`)
+- Added client-side validation parity:
+  - actor source required when actor id/display is provided
+  - assignee source required when assignee id/display is provided
+  - legacy ROI values cannot be negative
+- Added client workstream and signature parity methods:
+  - `getWorkstream`, `getWorkstreamInteractions`, `getWorkstreamParticipants`
+  - `generateSignatureHeaders`, `validateSignatureHeaders`
+- Added PAT/session parity helpers:
+  - `PatHelpers.signHashWithPAT`, `submitTransactionWithPAT`, `validateSignatureWithPAT`
+  - `PatHelpers.fetchWorkstream*` helpers
+  - `SessionValidator.validateSession`
+- Refreshed Java documentation and examples to match the current API behavior.

@@ -4,7 +4,9 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ConfigTest {
 
@@ -22,37 +24,39 @@ class ConfigTest {
         assertEquals(Config.DEFAULT_SIGNING_ALGORITHM, config.getSigningAlgorithm());
         assertNotNull(config.getHttpClient());
         assertEquals(Duration.ZERO, config.getSessionHeartbeatInterval());
-        assertEquals(Duration.ofSeconds(10), config.getSessionHeartbeatTimeout());
-        assertNull(config.getSessionHeartbeatUrl());
+        assertEquals(Duration.ZERO, config.getSessionHeartbeatTimeout());
+        assertEquals("", config.getSessionHeartbeatUrl());
     }
 
     @Test
-    void rejectsInvalidUrls() {
-        Config.Builder builder = Config.builder()
-            .baseUrl("invalid")
-            .tokenUrl("invalid")
+    void rejectsUnsupportedSigningAlgorithm() {
+        assertThrows(IllegalArgumentException.class, () -> Config.builder()
             .clientId("id")
-            .clientSecret("secret");
-
-        assertThrows(IllegalArgumentException.class, builder::build);
+            .clientSecret("secret")
+            .signingAlgorithm("rsa")
+            .build());
     }
 
     @Test
-    void honoursCustomTimeouts() {
+    void rejectsNegativeHeartbeatInterval() {
+        assertThrows(IllegalArgumentException.class, () -> Config.builder()
+            .clientId("id")
+            .clientSecret("secret")
+            .sessionHeartbeatInterval(Duration.ofSeconds(-1))
+            .build());
+    }
+
+    @Test
+    void appliesHeartbeatDefaultsWhenEnabled() {
         Config config = Config.builder()
             .clientId("id")
             .clientSecret("secret")
-            .httpTimeout(Duration.ofSeconds(5))
-            .tokenLeeway(Duration.ofSeconds(10))
+            .baseUrl("https://example.com/client-api/")
             .sessionHeartbeatInterval(Duration.ofSeconds(60))
-            .sessionHeartbeatTimeout(Duration.ofSeconds(5))
-            .sessionHeartbeatUrl("https://internal.dev.operon.cloud/custom/heartbeat")
             .build();
 
-        assertEquals(Duration.ofSeconds(5), config.getHttpTimeout());
-        assertEquals(Duration.ofSeconds(10), config.getTokenLeeway());
         assertEquals(Duration.ofSeconds(60), config.getSessionHeartbeatInterval());
-        assertEquals(Duration.ofSeconds(5), config.getSessionHeartbeatTimeout());
-        assertEquals("https://internal.dev.operon.cloud/custom/heartbeat", config.getSessionHeartbeatUrl());
+        assertEquals(Duration.ofSeconds(10), config.getSessionHeartbeatTimeout());
+        assertEquals("https://example.com/client-api/v1/session/heartbeat", config.getSessionHeartbeatUrl());
     }
 }

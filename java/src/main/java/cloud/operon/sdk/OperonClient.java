@@ -22,43 +22,35 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 /**
- * <p>
- * Primary entry point for interacting with Operon Platform services. The client is lightweight and thread-safe:
- * create a single instance per process, call {@link #init()} during startup (or let the first request initialise lazily),
- * and reuse it for the lifetime of the JVM.
- * </p>
- *
- * <h2>Key behaviours</h2>
- * <ul>
- *   <li>Caches OAuth client-credential tokens and refreshes them proactively using the leeway configured in {@link Config}.</li>
- *   <li>Optionally performs <em>self-signing</em> of payload hashes by delegating to Operon’s DID service. Disable this
- *       when you provide your own signatures.</li>
- *   <li>Maintains a local cache of interactions and participants so repeated submissions can resolve channel/DID metadata
- *       without hitting the network.</li>
- *   <li>Is defensive around concurrency: all caches and mutable state are guarded by synchronised blocks to keep behaviour
- *       deterministic even when multiple threads perform first-use initialisation simultaneously.</li>
- * </ul>
+ * Primary entry point for interacting with Operon Platform services.
  */
 public final class OperonClient implements AutoCloseable {
+
+    public static final String HEADER_OPERON_DID = "X-Operon-DID";
+    public static final String HEADER_OPERON_PAYLOAD_HASH = "X-Operon-Payload-Hash";
+    public static final String HEADER_OPERON_SIGNATURE = "X-Operon-Signature";
+    public static final String HEADER_OPERON_SIGNATURE_KEY = "X-Operon-Signature-KeyId";
+    public static final String HEADER_OPERON_SIGNATURE_ALGO = "X-Operon-Signature-Alg";
 
     private static final Logger LOGGER = Logger.getLogger(OperonClient.class.getName());
 
@@ -79,11 +71,10 @@ public final class OperonClient implements AutoCloseable {
 
     private final Object referenceLock = new Object();
     private boolean referenceLoaded;
-    private String referenceChannelId;
 
     private final Object participantLock = new Object();
     private String cachedParticipantDid;
-    private String cachedChannelId;
+    private String cachedWorkstreamId;
     private String cachedCustomerId;
     private String cachedWorkspaceId;
     private String cachedEmail;
@@ -93,16 +84,10 @@ public final class OperonClient implements AutoCloseable {
     private String cachedMemberId;
     private String cachedSessionId;
     private String cachedOrgId;
+
     private final Object heartbeatLock = new Object();
     private ScheduledExecutorService heartbeatExecutor;
 
-    /**
-     * Constructs a new Operon client using the supplied configuration.
-     *
-     * @param config caller-supplied configuration; only {@code clientId} and {@code clientSecret} are mandatory.
-     *               The constructor captures a defensive copy with defaults applied, so subsequent mutations to the builder
-     *               will not influence this client.
-     */
     public OperonClient(Config config) {
         Objects.requireNonNull(config, "config");
         this.config = config.withDefaults();
@@ -130,17 +115,6 @@ public final class OperonClient implements AutoCloseable {
         this.heartbeatUrl = this.config.getSessionHeartbeatUrl();
     }
 
-    /**
-     * Eagerly initialises the client by obtaining an access token.
-     *
-     * <p>
-     * The call is idempotent: multiple threads can safely invoke {@code init()} and only the first execution performs
-     * the remote token request. If the initial token exchange fails, the exception is memoised and rethrown for each
-     * subsequent attempt so that callers have a consistent failure mode.
-     * </p>
-     *
-     * @throws OperonException when the identity broker cannot issue a token (network failure, invalid credentials, etc.).
-     */
     public void init() throws OperonException {
         synchronized (initLock) {
             if (initAttempted) {
@@ -160,75 +134,53 @@ public final class OperonClient implements AutoCloseable {
         }
     }
 
-    /**
-     * Retrieves the cached interaction catalogue, loading it on-demand if required.
-     *
-     * <p>
-     * The first call fetches interactions from the platform and caches them in-memory. Later calls return a defensive copy,
-     * allowing application code to iterate freely without worrying about concurrent modifications.
-     * </p>
-     *
-     * @return immutable interaction summaries suitable for UI display or request pre-population.
-     * @throws OperonException when the reference data cannot be loaded (for example, due to network failures).
-     */
     public List<InteractionSummary> interactions() throws OperonException {
         ensureInitialized();
         ensureReferenceData();
-        return registry.interactions().stream()
-            .map(item -> new InteractionSummary(
+
+        List<InteractionSummary> summaries = new ArrayList<>();
+        for (Interaction item : registry.interactions()) {
+            summaries.add(new InteractionSummary(
                 item.id(),
-                item.channelId(),
+                item.workstreamId(),
+                item.workstreamName(),
+                item.name(),
+                item.description(),
+                item.status(),
                 item.sourceParticipantId(),
                 item.targetParticipantId(),
                 item.sourceDid(),
-                item.targetDid()
-            ))
-            .collect(Collectors.toList());
+                item.targetDid(),
+                item.type(),
+                item.actor(),
+                item.states(),
+                item.roiClassification(),
+                item.roiCost(),
+                item.roiTime()
+            ));
+        }
+        return summaries;
     }
 
-    /**
-     * Retrieves the cached participant directory (ID → DID).
-     *
-     * <p>
-     * Participants are loaded alongside interactions because clients often need both to construct valid transactions.
-     * The returned list is a snapshot; mutating it will not alter the internal cache.
-     * </p>
-     *
-     * @return participant summaries keyed by Operon participant id.
-     * @throws OperonException when the reference data cannot be loaded.
-     */
     public List<ParticipantSummary> participants() throws OperonException {
         ensureInitialized();
         ensureReferenceData();
-        return registry.participants().stream()
-            .map(item -> new ParticipantSummary(item.id(), item.did()))
-            .collect(Collectors.toList());
+
+        List<ParticipantSummary> summaries = new ArrayList<>();
+        for (Participant item : registry.participants()) {
+            summaries.add(new ParticipantSummary(
+                item.id(),
+                item.did(),
+                item.name(),
+                item.status(),
+                item.customerId(),
+                item.workstreamId(),
+                item.workstreamName()
+            ));
+        }
+        return summaries;
     }
 
-    /**
-     * Submits a transaction to the Operon Client API and returns the persisted record.
-     *
-     * <p>
-     * Workflow:
-     * </p>
-     * <ol>
-     *   <li>Ensures the client is initialised (minting a token if required).</li>
-     *   <li>Resolves interaction metadata so callers can omit channel/source/target identifiers when convenient.</li>
-     *   <li>Encodes payload bytes (or validates the supplied hash) and, when enabled, obtains a signature from the DID service.</li>
-     *   <li>Performs the HTTP POST to {@code /v1/transactions} and maps the response body into a {@link Transaction}.</li>
-     * </ol>
-     *
-     * <p>
-     * The method performs comprehensive validation before talking to the network. Any {@link OperonApiException} thrown reflects
-     * the exact error returned by the Operon backend (status code + error code + message).
-     * </p>
-     *
-     * @param request transaction payload to send. Must include {@code correlationId}, {@code interactionId}, and signature material.
-     *                When calling {@link TransactionRequest#payload(byte[])} the SDK derives the hash automatically; if you prefer
-     *                to stream large objects externally provide the pre-computed {@link TransactionRequest#payloadHash(String)}.
-     * @return the persisted transaction, exactly as recorded by the platform.
-     * @throws OperonException when validation fails, when signing cannot be performed, or when the HTTP call encounters an error.
-     */
     public Transaction submitTransaction(TransactionRequest request) throws OperonException {
         Objects.requireNonNull(request, "request");
         ensureInitialized();
@@ -246,66 +198,102 @@ public final class OperonClient implements AutoCloseable {
             signature = new Signature(null, null, null);
         }
 
-        if (selfSigning && (signature.value() == null || signature.value().isBlank())) {
+        if (selfSigning && trimToNull(signature.value()) == null) {
             SigningResult result = signer.sign(bearer, payloadHash, config.getSigningAlgorithm());
             signature = new Signature(result.algorithm(), result.value(), result.keyId());
         }
 
-        if (signature.algorithm() == null || signature.algorithm().isBlank()) {
+        if (trimToNull(signature.algorithm()) == null) {
             signature = new Signature(config.getSigningAlgorithm(), signature.value(), signature.keyId());
         }
-
-        if (signature.value() == null || signature.value().isBlank()) {
+        if (trimToNull(signature.value()) == null) {
             throw new OperonException("Signature value is required");
         }
 
-        if (signature.keyId() == null || signature.keyId().isBlank()) {
-            String source = Optional.ofNullable(context.sourceDid).orElse(cachedParticipantDid());
-            if (source != null && !source.isBlank()) {
+        if (trimToNull(signature.keyId()) == null) {
+            String source = firstNonEmpty(context.sourceDid(), cachedParticipantDid());
+            if (source != null) {
                 signature = signature.withKeyId(source + Config.DEFAULT_KEY_ID_SUFFIX);
             }
         }
 
         List<String> sanitizedTags = sanitizeTags(request.getTags());
-        String sanitizedLabel = optionalTrim(request.getLabel());
+        String sanitizedLabel = trimToNull(request.getLabel());
         Instant timestamp = request.getTimestamp() == null ? Instant.now() : request.getTimestamp();
 
         TransactionRequest validated = TransactionRequest.builder()
             .correlationId(request.getCorrelationId())
-            .channelId(context.channelId)
-            .interactionId(context.interactionId)
+            .workstreamId(context.workstreamId())
+            .interactionId(context.interactionId())
             .timestamp(timestamp)
-            .sourceDid(context.sourceDid)
-            .targetDid(context.targetDid)
+            .sourceDid(context.sourceDid())
+            .targetDid(context.targetDid())
+            .roiClassification(request.getRoiClassification())
+            .roiCost(request.getRoiCost())
+            .roiTime(request.getRoiTime())
+            .state(request.getState())
+            .stateId(request.getStateId())
+            .stateLabel(request.getStateLabel())
+            .roiBaseCost(request.getRoiBaseCost())
+            .roiBaseTime(request.getRoiBaseTime())
+            .roiCostSaving(request.getRoiCostSaving())
+            .roiTimeSaving(request.getRoiTimeSaving())
             .signature(signature)
             .label(sanitizedLabel)
             .tags(sanitizedTags)
             .payload(request.getPayload())
             .payloadHash(payloadHash)
+            .actorExternalId(request.getActorExternalId())
+            .actorExternalDisplayName(request.getActorExternalDisplayName())
+            .actorExternalSource(request.getActorExternalSource())
+            .assigneeExternalId(request.getAssigneeExternalId())
+            .assigneeExternalDisplayName(request.getAssigneeExternalDisplayName())
+            .assigneeExternalSource(request.getAssigneeExternalSource())
+            .customerId(request.getCustomerId())
+            .workspaceId(request.getWorkspaceId())
+            .createdBy(request.getCreatedBy())
             .build();
         validated.validateForSubmit();
 
         TransactionSubmission submission = new TransactionSubmission(
             validated.getCorrelationId(),
-            validated.getChannelId(),
+            validated.getWorkstreamId(),
             validated.getInteractionId(),
             DateTimeFormatter.ISO_INSTANT.format(timestamp),
             validated.getSourceDid(),
             validated.getTargetDid(),
+            validated.getRoiClassification(),
+            validated.getRoiCost(),
+            validated.getRoiTime(),
+            validated.getState(),
+            validated.getStateId(),
+            validated.getStateLabel(),
+            validated.getRoiBaseCost(),
+            validated.getRoiBaseTime(),
+            validated.getRoiCostSaving(),
+            validated.getRoiTimeSaving(),
             new SignaturePayload(signature.algorithm(), signature.value(), signature.keyId()),
             payloadHash,
             sanitizedLabel,
-            sanitizedTags.isEmpty() ? null : sanitizedTags
+            sanitizedTags,
+            trimToNull(validated.getActorExternalId()),
+            trimToNull(validated.getActorExternalDisplayName()),
+            trimToNull(validated.getActorExternalSource()),
+            trimToNull(validated.getAssigneeExternalId()),
+            trimToNull(validated.getAssigneeExternalDisplayName()),
+            trimToNull(validated.getAssigneeExternalSource()),
+            trimToNull(validated.getCustomerId()),
+            trimToNull(validated.getWorkspaceId()),
+            trimToNull(validated.getCreatedBy())
         );
 
         HttpResponse<java.io.InputStream> response;
         try {
             response = HttpUtil.sendJson(httpClient, "POST", baseUrl + "/v1/transactions", submission, bearer);
-        } catch (IOException | InterruptedException ex) {
-            if (ex instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-                throw new OperonException("submit transaction interrupted", ex);
-            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new OperonException("submit transaction interrupted", ex);
+        } catch (IOException ex) {
             throw new OperonException("submit transaction request: " + ex.getMessage(), ex);
         }
 
@@ -319,14 +307,217 @@ public final class OperonClient implements AutoCloseable {
         }
     }
 
-    /**
-     * Closes the client. Currently a no-op because the underlying {@link HttpClient} does not require explicit shutdown,
-     * but the hook is retained for future transport strategies (for example, if we introduce Netty-based clients that need disposal).
-     */
+    public Workstream getWorkstream() throws OperonException {
+        return getWorkstream((String) null);
+    }
+
+    public Workstream getWorkstream(String workstreamIdOverride) throws OperonException {
+        ensureInitialized();
+        String bearer = getToken().getAccessToken();
+        String workstream = resolveWorkstreamId(workstreamIdOverride);
+
+        HttpResponse<java.io.InputStream> response;
+        try {
+            response = HttpUtil.sendJson(
+                httpClient,
+                "GET",
+                baseUrl + "/v1/workstreams/" + urlEncodePath(workstream),
+                null,
+                bearer
+            );
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new OperonException("get workstream interrupted", ex);
+        } catch (IOException ex) {
+            throw new OperonException("get workstream request: " + ex.getMessage(), ex);
+        }
+
+        try (java.io.InputStream stream = response.body()) {
+            if (response.statusCode() >= 400) {
+                throw ApiErrorDecoder.decode(response.statusCode(), stream);
+            }
+            return Json.mapper().readValue(stream, Workstream.class);
+        } catch (IOException ex) {
+            throw new OperonException("decode workstream response: " + ex.getMessage(), ex);
+        }
+    }
+
+    public WorkstreamInteractionsResponse getWorkstreamInteractions(String... workstreamIdOverride)
+        throws OperonException {
+        ensureInitialized();
+        String bearer = getToken().getAccessToken();
+        String workstream = resolveWorkstreamId(workstreamIdOverride);
+
+        HttpResponse<java.io.InputStream> response;
+        try {
+            response = HttpUtil.sendJson(
+                httpClient,
+                "GET",
+                baseUrl + "/v1/workstreams/" + urlEncodePath(workstream) + "/interactions",
+                null,
+                bearer
+            );
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new OperonException("get workstream interactions interrupted", ex);
+        } catch (IOException ex) {
+            throw new OperonException("get workstream interactions request: " + ex.getMessage(), ex);
+        }
+
+        try (java.io.InputStream stream = response.body()) {
+            if (response.statusCode() >= 400) {
+                throw ApiErrorDecoder.decode(response.statusCode(), stream);
+            }
+            return Json.mapper().readValue(stream, WorkstreamInteractionsResponse.class);
+        } catch (IOException ex) {
+            throw new OperonException("decode workstream interactions response: " + ex.getMessage(), ex);
+        }
+    }
+
+    public WorkstreamParticipantsResponse getWorkstreamParticipants(String... workstreamIdOverride)
+        throws OperonException {
+        ensureInitialized();
+        String bearer = getToken().getAccessToken();
+        String workstream = resolveWorkstreamId(workstreamIdOverride);
+
+        HttpResponse<java.io.InputStream> response;
+        try {
+            response = HttpUtil.sendJson(
+                httpClient,
+                "GET",
+                baseUrl + "/v1/workstreams/" + urlEncodePath(workstream) + "/participants",
+                null,
+                bearer
+            );
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new OperonException("get workstream participants interrupted", ex);
+        } catch (IOException ex) {
+            throw new OperonException("get workstream participants request: " + ex.getMessage(), ex);
+        }
+
+        try (java.io.InputStream stream = response.body()) {
+            if (response.statusCode() >= 400) {
+                throw ApiErrorDecoder.decode(response.statusCode(), stream);
+            }
+            return Json.mapper().readValue(stream, WorkstreamParticipantsResponse.class);
+        } catch (IOException ex) {
+            throw new OperonException("decode workstream participants response: " + ex.getMessage(), ex);
+        }
+    }
+
+    public Map<String, String> generateSignatureHeaders(byte[] payload, String algorithm) throws OperonException {
+        ensureInitialized();
+
+        String selectedAlgorithm = trimToNull(algorithm);
+        if (selectedAlgorithm == null) {
+            selectedAlgorithm = config.getSigningAlgorithm();
+        } else {
+            selectedAlgorithm = Config.canonicalSigningAlgorithm(selectedAlgorithm);
+            if (selectedAlgorithm == null) {
+                throw new OperonException("unsupported signing algorithm " + algorithm);
+            }
+        }
+
+        String payloadHash = computePayloadHash(payload == null ? new byte[0] : payload);
+
+        Token token = getToken();
+        if (!selfSigning) {
+            throw new OperonException("automatic signing disabled: enable self signing to generate headers");
+        }
+
+        SigningResult result = signer.sign(token.getAccessToken(), payloadHash, selectedAlgorithm);
+
+        String did = trimToNull(cachedParticipantDid());
+        if (did == null) {
+            throw new OperonException("participant DID unavailable on access token");
+        }
+
+        String signatureValue = trimToNull(result.value());
+        if (signatureValue == null) {
+            throw new OperonException("signature value missing from signing response");
+        }
+
+        String keyId = trimToNull(result.keyId());
+        if (keyId == null) {
+            keyId = did + Config.DEFAULT_KEY_ID_SUFFIX;
+        }
+
+        String signatureAlgorithm = trimToNull(result.algorithm());
+        if (signatureAlgorithm == null) {
+            signatureAlgorithm = selectedAlgorithm;
+        }
+
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put(HEADER_OPERON_DID, did);
+        headers.put(HEADER_OPERON_PAYLOAD_HASH, payloadHash);
+        headers.put(HEADER_OPERON_SIGNATURE, signatureValue);
+        headers.put(HEADER_OPERON_SIGNATURE_KEY, keyId);
+        headers.put(HEADER_OPERON_SIGNATURE_ALGO, signatureAlgorithm);
+        return headers;
+    }
+
+    public Map<String, String> generateSignatureHeadersFromString(String payload, String algorithm)
+        throws OperonException {
+        byte[] bytes = payload == null ? new byte[0] : payload.getBytes(StandardCharsets.UTF_8);
+        return generateSignatureHeaders(bytes, algorithm);
+    }
+
+    public SignatureValidationResult validateSignatureHeaders(byte[] payload, Map<String, String> headers)
+        throws OperonException {
+        ensureInitialized();
+        Map<String, String> sanitized = PatHelpers.sanitizeOperonHeaders(headers);
+
+        String computedHash = computePayloadHash(payload == null ? new byte[0] : payload);
+        String expectedHash = sanitized.get(HEADER_OPERON_PAYLOAD_HASH);
+        if (!computedHash.equalsIgnoreCase(expectedHash)) {
+            throw new OperonException(
+                "payload hash mismatch: expected " + computedHash + ", got " + expectedHash
+            );
+        }
+
+        String bearer = getToken().getAccessToken();
+
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+            .uri(URI.create(
+                baseUrl + "/v1/dids/" + urlEncodePath(sanitized.get(HEADER_OPERON_DID)) + "/signature/verify"
+            ))
+            .POST(HttpRequest.BodyPublishers.ofByteArray(payload == null ? new byte[0] : payload))
+            .header("Authorization", "Bearer " + bearer);
+
+        for (Map.Entry<String, String> entry : sanitized.entrySet()) {
+            requestBuilder.header(entry.getKey(), entry.getValue());
+        }
+
+        HttpResponse<java.io.InputStream> response;
+        try {
+            response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofInputStream());
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new OperonException("POST /v1/dids/{did}/signature/verify interrupted", ex);
+        } catch (IOException ex) {
+            throw new OperonException("POST /v1/dids/{did}/signature/verify: " + ex.getMessage(), ex);
+        }
+
+        try (java.io.InputStream stream = response.body()) {
+            if (response.statusCode() >= 400) {
+                throw ApiErrorDecoder.decode(response.statusCode(), stream);
+            }
+            return Json.mapper().readValue(stream, SignatureValidationResult.class);
+        } catch (IOException ex) {
+            throw new OperonException("decode signature validation response: " + ex.getMessage(), ex);
+        }
+    }
+
+    public SignatureValidationResult validateSignatureHeadersFromString(String payload, Map<String, String> headers)
+        throws OperonException {
+        byte[] bytes = payload == null ? new byte[0] : payload.getBytes(StandardCharsets.UTF_8);
+        return validateSignatureHeaders(bytes, headers);
+    }
+
     @Override
     public void close() {
         stopHeartbeat();
-        // httpClient is managed externally; nothing to close.
     }
 
     private void ensureInitialized() throws OperonException {
@@ -337,43 +528,32 @@ public final class OperonClient implements AutoCloseable {
     }
 
     private void ensureReferenceData() throws OperonException {
-        Token token = getToken();
-        String channelId = optionalTrim(token.getChannelId());
-        if (channelId == null) {
-            throw new OperonException("channel ID unavailable on access token; cannot load reference data");
-        }
-
-        if (referenceLoaded && Objects.equals(referenceChannelId, channelId)) {
+        if (referenceLoaded) {
             return;
         }
 
         synchronized (referenceLock) {
-            if (referenceLoaded && Objects.equals(referenceChannelId, channelId)) {
+            if (referenceLoaded) {
                 return;
             }
-            loadReferenceData(token.getAccessToken(), channelId);
+            Token token = getToken();
+            loadReferenceData(token.getAccessToken());
             referenceLoaded = true;
-            referenceChannelId = channelId;
         }
     }
 
     private void reloadReferenceData() throws OperonException {
         synchronized (referenceLock) {
             Token token = getToken();
-            String channelId = optionalTrim(token.getChannelId());
-            if (channelId == null) {
-                throw new OperonException("channel ID unavailable on access token; cannot reload reference data");
-            }
-            loadReferenceData(token.getAccessToken(), channelId);
+            loadReferenceData(token.getAccessToken());
             referenceLoaded = true;
-            referenceChannelId = channelId;
         }
     }
 
-    private void loadReferenceData(String bearer, String channelId) throws OperonException {
-        LOGGER.info(() -> "[operon-sdk] refreshing reference data cache");
-        List<Interaction> interactions = fetchInteractions(bearer, channelId);
-        List<Participant> participants = fetchParticipants(bearer, channelId);
+    private void loadReferenceData(String bearer) throws OperonException {
+        LOGGER.info("[operon-sdk] refreshing reference data cache");
+        List<Interaction> interactions = fetchInteractions(bearer);
+        List<Participant> participants = fetchParticipants(bearer);
 
         Map<String, String> participantDidLookup = new HashMap<>();
         for (Participant participant : participants) {
@@ -382,13 +562,13 @@ public final class OperonClient implements AutoCloseable {
 
         List<Interaction> enriched = new ArrayList<>(interactions.size());
         for (Interaction interaction : interactions) {
+            Interaction updated = interaction;
             String sourceDid = participantDidLookup.get(interaction.sourceParticipantId());
             String targetDid = participantDidLookup.get(interaction.targetParticipantId());
-            Interaction updated = interaction;
-            if (sourceDid != null) {
+            if (sourceDid != null && !sourceDid.isBlank()) {
                 updated = updated.withSourceDid(sourceDid);
             }
-            if (targetDid != null) {
+            if (targetDid != null && !targetDid.isBlank()) {
                 updated = updated.withTargetDid(targetDid);
             }
             enriched.add(updated);
@@ -401,84 +581,93 @@ public final class OperonClient implements AutoCloseable {
             enriched.size(), participants.size()));
     }
 
-    private List<Interaction> fetchInteractions(String bearer, String channelId) throws OperonException {
-        String encodedChannel = URLEncoder.encode(channelId, StandardCharsets.UTF_8);
-        String path = String.format(Locale.ROOT, "/v1/channels/%s/interactions", encodedChannel);
-        LOGGER.info(() -> "[operon-sdk] requesting " + path);
+    private List<Interaction> fetchInteractions(String bearer) throws OperonException {
+        String path = "/v1/interactions";
         HttpResponse<java.io.InputStream> response;
         try {
             response = HttpUtil.sendJson(httpClient, "GET", baseUrl + path, null, bearer);
-        } catch (IOException | InterruptedException ex) {
-            if (ex instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-                throw new OperonException("fetch interactions interrupted", ex);
-            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new OperonException("fetch interactions interrupted", ex);
+        } catch (IOException ex) {
             throw new OperonException("fetch interactions request: " + ex.getMessage(), ex);
         }
 
-        try (java.io.InputStream bodyStream = response.body()) {
+        try (java.io.InputStream stream = response.body()) {
             if (response.statusCode() >= 400) {
-                throw ApiErrorDecoder.decode(response.statusCode(), bodyStream);
+                throw ApiErrorDecoder.decode(response.statusCode(), stream);
             }
 
-            JsonNode root = Json.mapper().readTree(bodyStream);
-            JsonNode data = root.path("interactions");
+            JsonNode root = Json.mapper().readTree(stream);
+            JsonNode data = root.path("data");
             List<Interaction> results = new ArrayList<>();
             if (data.isArray()) {
                 for (JsonNode node : data) {
                     results.add(new Interaction(
-                        node.path("id").asText(),
-                        node.path("channelId").asText(),
-                        node.path("sourceParticipantId").asText(),
-                        node.path("targetParticipantId").asText(),
-                        null,
-                        null
+                        node.path("id").asText(null),
+                        firstNonEmpty(node.path("workstreamId").asText(null), node.path("channelId").asText(null)),
+                        node.path("workstreamName").asText(null),
+                        node.path("name").asText(null),
+                        node.path("description").asText(null),
+                        node.path("status").asText(null),
+                        node.path("sourceParticipantId").asText(null),
+                        node.path("targetParticipantId").asText(null),
+                        node.path("sourceDid").asText(null),
+                        node.path("targetDid").asText(null),
+                        node.path("type").asText(null),
+                        node.path("actor").asText(null),
+                        readStringArray(node.path("states")),
+                        node.path("roiClassification").asText(null),
+                        node.path("roiCost").isInt() ? node.path("roiCost").asInt() : null,
+                        node.path("roiTime").isInt() ? node.path("roiTime").asInt() : null
                     ));
                 }
             }
-            LOGGER.info(() -> String.format(Locale.ROOT,
-                "[operon-sdk] %s returned %d records", path, results.size()));
             return results;
         } catch (IOException ex) {
             throw new OperonException("decode interactions response: " + ex.getMessage(), ex);
         }
     }
 
-    private List<Participant> fetchParticipants(String bearer, String channelId) throws OperonException {
-        String encodedChannel = URLEncoder.encode(channelId, StandardCharsets.UTF_8);
-        String path = String.format(Locale.ROOT, "/v1/channels/%s/participants", encodedChannel);
-        LOGGER.info(() -> "[operon-sdk] requesting " + path);
+    private List<Participant> fetchParticipants(String bearer) throws OperonException {
+        String path = "/v1/participants";
         HttpResponse<java.io.InputStream> response;
         try {
             response = HttpUtil.sendJson(httpClient, "GET", baseUrl + path, null, bearer);
-        } catch (IOException | InterruptedException ex) {
-            if (ex instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-                throw new OperonException("fetch participants interrupted", ex);
-            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new OperonException("fetch participants interrupted", ex);
+        } catch (IOException ex) {
             throw new OperonException("fetch participants request: " + ex.getMessage(), ex);
         }
 
-        try (java.io.InputStream bodyStream = response.body()) {
+        try (java.io.InputStream stream = response.body()) {
             if (response.statusCode() >= 400) {
-                throw ApiErrorDecoder.decode(response.statusCode(), bodyStream);
+                throw ApiErrorDecoder.decode(response.statusCode(), stream);
             }
 
-            JsonNode root = Json.mapper().readTree(bodyStream);
-            JsonNode data = root.path("participants");
+            JsonNode root = Json.mapper().readTree(stream);
+            JsonNode data = root.path("data");
             List<Participant> results = new ArrayList<>();
             if (data.isArray()) {
                 for (JsonNode node : data) {
-                    String id = node.path("id").asText();
-                    String did = node.path("did").asText();
-                    if (id == null || id.isBlank() || did == null || did.isBlank()) {
+                    String id = node.path("id").asText(null);
+                    String did = node.path("did").asText(null);
+                    if (trimToNull(id) == null || trimToNull(did) == null) {
                         continue;
                     }
-                    results.add(new Participant(id, did));
+
+                    results.add(new Participant(
+                        id,
+                        did,
+                        node.path("name").asText(null),
+                        node.path("status").asText(null),
+                        node.path("customerId").asText(null),
+                        firstNonEmpty(node.path("workstreamId").asText(null), node.path("channelId").asText(null)),
+                        node.path("workstreamName").asText(null)
+                    ));
                 }
             }
-            LOGGER.info(() -> String.format(Locale.ROOT,
-                "[operon-sdk] %s returned %d records", path, results.size()));
             return results;
         } catch (IOException ex) {
             throw new OperonException("decode participants response: " + ex.getMessage(), ex);
@@ -486,30 +675,23 @@ public final class OperonClient implements AutoCloseable {
     }
 
     private TransactionContext buildContext(TransactionRequest request) throws OperonException {
-        String correlationId = optionalTrim(request.getCorrelationId());
-        if (correlationId == null) {
-            throw new OperonException("CorrelationID is required");
-        }
+        String workstreamId = trimToNull(request.getWorkstreamId());
+        String interactionId = trimToNull(request.getInteractionId());
+        String sourceDid = trimToNull(request.getSourceDid());
+        String targetDid = trimToNull(request.getTargetDid());
 
-        String channelId = optionalTrim(request.getChannelId());
-        String interactionId = optionalTrim(request.getInteractionId());
-        String sourceDid = optionalTrim(request.getSourceDid());
-        String targetDid = optionalTrim(request.getTargetDid());
-
-        if (interactionId == null || interactionId.isBlank()) {
-            if (sourceDid == null || sourceDid.isBlank()) {
+        if (interactionId == null) {
+            if (sourceDid == null) {
                 sourceDid = cachedParticipantDid();
             }
-            if (channelId == null || channelId.isBlank()) {
-                channelId = cachedChannelId();
+            if (workstreamId == null) {
+                workstreamId = cachedWorkstreamId();
             }
-            return new TransactionContext(channelId, interactionId, sourceDid, targetDid);
+            return new TransactionContext(workstreamId, interactionId, sourceDid, targetDid);
         }
 
         Interaction interaction = registry.interaction(interactionId);
         if (interaction == null) {
-            LOGGER.info(() -> String.format(Locale.ROOT,
-                "[operon-sdk] interaction %s not found in cache; triggering reload", interactionId));
             reloadReferenceData();
             interaction = registry.interaction(interactionId);
             if (interaction == null) {
@@ -517,47 +699,56 @@ public final class OperonClient implements AutoCloseable {
             }
         }
 
-        Interaction resolved = interaction;
-        LOGGER.info(() -> String.format(Locale.ROOT,
-            "[operon-sdk] resolving interaction %s (channel %s, sourceParticipant %s, targetParticipant %s)",
-            interactionId,
-            resolved.channelId(),
-            resolved.sourceParticipantId(),
-            resolved.targetParticipantId()));
-
-        if (channelId == null || channelId.isBlank()) {
-            channelId = optionalTrim(resolved.channelId());
-            if (channelId == null || channelId.isBlank()) {
-                channelId = cachedChannelId();
-            }
+        if (workstreamId == null) {
+            workstreamId = firstNonEmpty(trimToNull(interaction.workstreamId()), cachedWorkstreamId());
         }
 
-        if (sourceDid == null || sourceDid.isBlank()) {
-            sourceDid = optionalTrim(resolved.sourceDid());
-            if (sourceDid == null || sourceDid.isBlank()) {
+        if (sourceDid == null) {
+            sourceDid = trimToNull(interaction.sourceDid());
+            if (sourceDid == null) {
                 throw new OperonException("interaction " + interactionId + " missing source DID");
             }
         }
 
-        if (targetDid == null || targetDid.isBlank()) {
-            targetDid = optionalTrim(resolved.targetDid());
-            if (targetDid == null || targetDid.isBlank()) {
+        if (targetDid == null) {
+            targetDid = trimToNull(interaction.targetDid());
+            if (targetDid == null) {
                 throw new OperonException("interaction " + interactionId + " missing target DID");
             }
         }
 
-        if (sourceDid == null || sourceDid.isBlank()) {
+        if (sourceDid == null) {
             sourceDid = cachedParticipantDid();
         }
 
-        return new TransactionContext(channelId, interactionId, sourceDid, targetDid);
+        return new TransactionContext(workstreamId, interactionId, sourceDid, targetDid);
+    }
+
+    private String resolveWorkstreamId(String... override) throws OperonException {
+        if (override != null) {
+            for (String value : override) {
+                String trimmed = trimToNull(value);
+                if (trimmed != null) {
+                    return trimmed;
+                }
+            }
+        }
+
+        String cached = trimToNull(cachedWorkstreamId());
+        if (cached != null) {
+            return cached;
+        }
+
+        throw new OperonException(
+            "workstream ID is required: token not scoped to a workstream and no override provided"
+        );
     }
 
     private Token getToken() throws OperonException {
         Token token = tokenProvider.token();
         synchronized (participantLock) {
             cachedParticipantDid = emptyToNull(token.getParticipantDid());
-            cachedChannelId = emptyToNull(token.getChannelId());
+            cachedWorkstreamId = emptyToNull(token.getWorkstreamId());
             cachedCustomerId = emptyToNull(token.getCustomerId());
             cachedWorkspaceId = emptyToNull(token.getWorkspaceId());
             cachedEmail = emptyToNull(token.getEmail());
@@ -577,28 +768,46 @@ public final class OperonClient implements AutoCloseable {
         }
     }
 
-    private String cachedChannelId() {
+    private String cachedWorkstreamId() {
         synchronized (participantLock) {
-            return cachedChannelId;
+            return cachedWorkstreamId;
         }
     }
 
     private static List<String> sanitizeTags(Collection<String> tags) {
         if (tags == null || tags.isEmpty()) {
+            return null;
+        }
+
+        List<String> results = new ArrayList<>();
+        for (String tag : tags) {
+            String trimmed = trimToNull(tag);
+            if (trimmed != null) {
+                results.add(trimmed);
+            }
+        }
+        return results.isEmpty() ? null : results;
+    }
+
+    private static List<String> readStringArray(JsonNode node) {
+        if (!node.isArray()) {
             return List.of();
         }
-        return tags.stream()
-            .filter(Objects::nonNull)
-            .map(String::trim)
-            .filter(s -> !s.isEmpty())
-            .distinct()
-            .collect(Collectors.toList());
+        List<String> values = new ArrayList<>();
+        node.forEach(item -> {
+            if (item.isTextual() && !item.asText().isBlank()) {
+                values.add(item.asText());
+            }
+        });
+        return List.copyOf(values);
     }
 
     private void startHeartbeat() {
-        if (heartbeatUrl == null || heartbeatInterval == null || heartbeatInterval.isZero() || heartbeatInterval.isNegative()) {
+        if (trimToNull(heartbeatUrl) == null || heartbeatInterval == null
+            || heartbeatInterval.isZero() || heartbeatInterval.isNegative()) {
             return;
         }
+
         synchronized (heartbeatLock) {
             if (heartbeatExecutor != null) {
                 return;
@@ -631,7 +840,7 @@ public final class OperonClient implements AutoCloseable {
     }
 
     private void performHeartbeat() throws OperonException, IOException, InterruptedException {
-        if (heartbeatUrl == null) {
+        if (trimToNull(heartbeatUrl) == null) {
             return;
         }
 
@@ -653,7 +862,21 @@ public final class OperonClient implements AutoCloseable {
         }
     }
 
-    private static String optionalTrim(String value) {
+    static String computePayloadHash(byte[] payload) throws OperonException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] sum = digest.digest(payload);
+            return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(sum);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new OperonException("SHA-256 not available", ex);
+        }
+    }
+
+    private static String urlEncodePath(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private static String trimToNull(String value) {
         if (value == null) {
             return null;
         }
@@ -661,14 +884,24 @@ public final class OperonClient implements AutoCloseable {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private static String emptyToNull(String value) {
-        if (value == null || value.isBlank()) {
+    private static String firstNonEmpty(String... values) {
+        if (values == null) {
             return null;
         }
-        return value;
+        for (String value : values) {
+            String trimmed = trimToNull(value);
+            if (trimmed != null) {
+                return trimmed;
+            }
+        }
+        return null;
     }
 
-    private record TransactionContext(String channelId, String interactionId, String sourceDid, String targetDid) {
+    private static String emptyToNull(String value) {
+        return trimToNull(value);
+    }
+
+    private record TransactionContext(String workstreamId, String interactionId, String sourceDid, String targetDid) {
     }
 
     private record SignaturePayload(String algorithm, String value, String keyId) {
@@ -676,15 +909,34 @@ public final class OperonClient implements AutoCloseable {
 
     private record TransactionSubmission(
         String correlationId,
-        String channelId,
+        String workstreamId,
         String interactionId,
         String timestamp,
         String sourceDid,
         String targetDid,
+        String roiClassification,
+        Integer roiCost,
+        Integer roiTime,
+        String state,
+        String stateId,
+        String stateLabel,
+        Integer roiBaseCost,
+        Integer roiBaseTime,
+        Integer roiCostSaving,
+        Integer roiTimeSaving,
         SignaturePayload signature,
         String payloadHash,
         String label,
-        List<String> tags
+        List<String> tags,
+        String actorExternalId,
+        String actorExternalDisplayName,
+        String actorExternalSource,
+        String assigneeExternalId,
+        String assigneeExternalDisplayName,
+        String assigneeExternalSource,
+        String customerId,
+        String workspaceId,
+        String createdBy
     ) {
     }
 }

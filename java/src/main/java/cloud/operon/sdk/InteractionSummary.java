@@ -1,22 +1,35 @@
 package cloud.operon.sdk;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.List;
+
 /**
- * Lightweight projection of an interaction. Returned by {@link OperonClient#interactions()} and designed to power
- * administrative UIs or build pipelines that need to pre-populate interaction-dependent fields.
- *
- * @param id                  interaction identifier.
- * @param channelId           channel associated with the interaction.
- * @param sourceParticipantId source participant id.
- * @param targetParticipantId target participant id.
- * @param sourceDid           resolved source DID (nullable when not yet hydrated).
- * @param targetDid           resolved target DID (nullable when not yet hydrated).
+ * Lightweight projection of an interaction.
  */
 public record InteractionSummary(
     String id,
-    String channelId,
+    @JsonProperty("workstreamId") @JsonAlias("channelId") String workstreamId,
+    String workstreamName,
+    String name,
+    String description,
+    String status,
     String sourceParticipantId,
     String targetParticipantId,
     String sourceDid,
-    String targetDid
+    String targetDid,
+    String type,
+    String actor,
+    List<String> states,
+    String roiClassification,
+    Integer roiCost,
+    Integer roiTime
 ) {
+    /**
+     * Legacy alias for compatibility with old channel terminology.
+     */
+    public String channelId() {
+        return workstreamId;
+    }
 }

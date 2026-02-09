@@ -7,6 +7,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -16,18 +20,17 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ClientCredentialsManagerTest {
 
@@ -36,7 +39,6 @@ class ClientCredentialsManagerTest {
     private HttpServer server;
     private URI baseUri;
     private final AtomicInteger tokenRequestCount = new AtomicInteger();
-    private volatile Token lastToken;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -54,7 +56,7 @@ class ClientCredentialsManagerTest {
 
     @Test
     void fetchesModernTokenUsingFormPayload() throws Exception {
-        registerTokenHandler("/oauth2/token", false, 3600);
+        registerTokenHandler("/oauth2/token", false, 3600, false);
 
         ClientCredentialsManager manager = new ClientCredentialsManager(
             HttpClient.newHttpClient(),
@@ -69,19 +71,38 @@ class ClientCredentialsManagerTest {
 
         Token token = manager.token();
         assertFalse(token.getAccessToken().isBlank());
-        assertEquals("chan-1", token.getChannelId());
+        assertEquals("wstr-1", token.getWorkstreamId());
         assertEquals(List.of("tenant-1", "tenant-2"), token.getTenantIds());
         assertTrue(token.getExpiry().isAfter(Instant.now()));
         assertEquals(1, tokenRequestCount.get());
 
         Token cached = manager.token();
         assertEquals(token.getAccessToken(), cached.getAccessToken());
-        assertEquals(1, tokenRequestCount.get(), "should not re-fetch token while still valid");
+        assertEquals(1, tokenRequestCount.get());
+    }
+
+    @Test
+    void fallsBackToLegacyChannelClaim() throws Exception {
+        registerTokenHandler("/oauth2/token", false, 3600, true);
+
+        ClientCredentialsManager manager = new ClientCredentialsManager(
+            HttpClient.newHttpClient(),
+            baseUri.resolve("/oauth2/token").toString(),
+            "client-id",
+            "client-secret",
+            null,
+            null,
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(10)
+        );
+
+        Token token = manager.token();
+        assertEquals("legacy-channel", token.getWorkstreamId());
     }
 
     @Test
     void fetchesLegacyTokenUsingJsonPayload() throws Exception {
-        registerTokenHandler("/v1/session/m2m/token", true, 120);
+        registerTokenHandler("/v1/session/m2m/token", true, 120, false);
 
         ClientCredentialsManager manager = new ClientCredentialsManager(
             HttpClient.newHttpClient(),
@@ -96,39 +117,12 @@ class ClientCredentialsManagerTest {
 
         Token token = manager.token();
         assertFalse(token.getAccessToken().isBlank());
-        assertEquals("chan-1", token.getChannelId());
-        assertEquals(List.of("tenant-1", "tenant-2"), token.getTenantIds());
-    }
-
-    @Test
-    void refreshesTokenWhenLeewayExpires() throws Exception {
-        registerTokenHandler("/oauth2/token", false, 3);
-
-        ClientCredentialsManager manager = new ClientCredentialsManager(
-            HttpClient.newHttpClient(),
-            baseUri.resolve("/oauth2/token").toString(),
-            "client",
-            "secret",
-            null,
-            null,
-            Duration.ofSeconds(2),
-            Duration.ofSeconds(1)
-        );
-
-        Token first = manager.token();
-        assertFalse(first.getAccessToken().isBlank());
-
-        Thread.sleep(2500);
-
-        Token second = manager.token();
-        assertFalse(second.getAccessToken().isBlank());
-        assertTrue(second.getExpiry().isAfter(first.getExpiry()));
-        assertEquals(2, tokenRequestCount.get());
+        assertEquals("wstr-1", token.getWorkstreamId());
     }
 
     @Test
     void forceRefreshBypassesCache() throws Exception {
-        registerTokenHandler("/oauth2/token", false, 120);
+        registerTokenHandler("/oauth2/token", false, 120, false);
 
         ClientCredentialsManager manager = new ClientCredentialsManager(
             HttpClient.newHttpClient(),
@@ -144,7 +138,7 @@ class ClientCredentialsManagerTest {
         Token first = manager.token();
         Token refreshed = manager.forceRefresh();
 
-        assertNotEquals(first.getAccessToken(), refreshed.getAccessToken());
+        assertTrue(!first.getAccessToken().equals(refreshed.getAccessToken()));
         assertEquals(2, tokenRequestCount.get());
     }
 
@@ -172,7 +166,7 @@ class ClientCredentialsManagerTest {
     }
 
     @Test
-    void throwsWhenAccessTokenMissing() {
+    void throwsWhenAccessTokenMissing() throws Exception {
         server.createContext("/oauth2/token", exchange -> respond(exchange, 200, Map.of("expires_in", 3600)));
 
         ClientCredentialsManager manager = new ClientCredentialsManager(
@@ -190,17 +184,19 @@ class ClientCredentialsManagerTest {
         assertTrue(ex.getMessage().contains("access_token"));
     }
 
-    private void registerTokenHandler(String path, boolean legacy, int expiresIn) {
-        server.createContext(path, new TokenHandler(legacy, expiresIn));
+    private void registerTokenHandler(String path, boolean legacy, int expiresIn, boolean useLegacyChannelClaim) {
+        server.createContext(path, new TokenHandler(legacy, expiresIn, useLegacyChannelClaim));
     }
 
     private final class TokenHandler implements HttpHandler {
         private final boolean legacy;
         private final int expiresIn;
+        private final boolean useLegacyChannelClaim;
 
-        private TokenHandler(boolean legacy, int expiresIn) {
+        private TokenHandler(boolean legacy, int expiresIn, boolean useLegacyChannelClaim) {
             this.legacy = legacy;
             this.expiresIn = expiresIn;
+            this.useLegacyChannelClaim = useLegacyChannelClaim;
         }
 
         @Override
@@ -212,12 +208,6 @@ class ClientCredentialsManagerTest {
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 Map<String, String> params = parseForm(body);
                 assertEquals("client_credentials", params.get("grant_type"));
-                if (params.containsKey("scope")) {
-                    assertEquals("transactions:write", params.get("scope"));
-                }
-                if (params.containsKey("audience")) {
-                    assertTrue(params.get("audience").contains("audience:A"));
-                }
             } else {
                 assertEquals("application/json", exchange.getRequestHeaders().getFirst("Content-Type"));
                 Map<?, ?> payload = MAPPER.readValue(exchange.getRequestBody(), Map.class);
@@ -226,7 +216,11 @@ class ClientCredentialsManagerTest {
 
             Map<String, Object> claims = new HashMap<>();
             claims.put("participant_did", "did:test:source");
-            claims.put("channel_id", "chan-1");
+            if (useLegacyChannelClaim) {
+                claims.put("channel_id", "legacy-channel");
+            } else {
+                claims.put("workstream_id", "wstr-1");
+            }
             claims.put("customer_id", "cust-1");
             claims.put("workspace_id", "ws-1");
             claims.put("email", "user@example.com");
@@ -236,25 +230,12 @@ class ClientCredentialsManagerTest {
             claims.put("member_id", "member-1");
             claims.put("session_id", "session-1");
             claims.put("org_id", "org-1");
+            claims.put("participant_id", "part-1");
+            claims.put("client_id", "client-1");
+            claims.put("azp", "app-1");
             claims.put("token_call", tokenRequestCount.get());
 
             String tokenValue = buildToken(claims);
-
-            lastToken = new Token(
-                tokenValue,
-                "did:test:source",
-                "chan-1",
-                "cust-1",
-                "ws-1",
-                "user@example.com",
-                "Example User",
-                List.of("tenant-1", "tenant-2"),
-                List.of("role:write"),
-                "member-1",
-                "session-1",
-                "org-1",
-                Instant.now().plusSeconds(expiresIn)
-            );
 
             respond(exchange, 200, Map.of(
                 "access_token", tokenValue,

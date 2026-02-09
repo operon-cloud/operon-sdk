@@ -1,17 +1,15 @@
 # Operon Java SDK
 
-Enterprise‑grade Java client for the [Operon.Cloud](https://www.operon.cloud) platform. The SDK targets Java 17+ (tested on JDK 17 and 21) and is packaged with Maven.
+Enterprise-grade Java client for [Operon.Cloud](https://www.operon.cloud).
+Targets Java 17+ and is aligned with Go SDK `v1.3.0`.
 
 ## Install
-
-Use the Maven coordinates once the artifact is published (example coordinates shown):
 
 ```xml
 <dependency>
   <groupId>cloud.operon</groupId>
   <artifactId>operon-sdk</artifactId>
-  <version>1.0.2</version>
-  <scope>compile</scope>
+  <version>1.3.0</version>
 </dependency>
 ```
 
@@ -19,14 +17,8 @@ Gradle (Kotlin DSL):
 
 ```kotlin
 dependencies {
-  implementation("cloud.operon:operon-sdk:1.0.2")
+  implementation("cloud.operon:operon-sdk:1.3.0")
 }
-```
-
-During local development (from the repo root):
-
-```bash
-mvn -f java/pom.xml -DskipTests=false clean verify
 ```
 
 ## Quick Start
@@ -34,14 +26,12 @@ mvn -f java/pom.xml -DskipTests=false clean verify
 ```java
 import cloud.operon.sdk.*;
 
-public class Example {
-  public static void main(String[] args) throws Exception {
-    Config config = Config.builder()
-        .clientId(System.getenv("OPERON_CLIENT_ID"))
-        .clientSecret(System.getenv("OPERON_CLIENT_SECRET"))
-        .build();
+Config config = Config.builder()
+    .clientId(System.getenv("OPERON_CLIENT_ID"))
+    .clientSecret(System.getenv("OPERON_CLIENT_SECRET"))
+    .build();
 
-    OperonClient client = new OperonClient(config);
+try (OperonClient client = new OperonClient(config)) {
     client.init();
 
     TransactionRequest request = TransactionRequest.builder()
@@ -51,17 +41,31 @@ public class Example {
         .build();
 
     Transaction txn = client.submitTransaction(request);
-    System.out.println("transaction=" + txn.getId());
-  }
+    System.out.println("transaction=" + txn.id());
 }
 ```
 
-> **Security note**
-> The Java SDK mirrors the Go implementation: every payload is hashed locally and only the hash (`payloadHash`) is transmitted to Operon. Raw payload bytes remain in your application.
+Security note: payload bytes are hashed locally (SHA-256) and only `payloadHash` is sent.
 
-### Keep sessions warm (optional heartbeat)
+## API Surface
 
-Long-lived JVM services can enable a background heartbeat that calls `/v1/session/heartbeat` on a fixed cadence and forces an immediate token refresh when Operon responds with 401. Just set the interval on the config builder:
+- Transaction submit with self-sign or manual-sign
+- Full transaction parity fields (state, ROI compatibility fields, actor/assignee attribution)
+- Reference cache via `/v1/interactions` and `/v1/participants`
+- Workstream APIs:
+  - `getWorkstream`
+  - `getWorkstreamInteractions`
+  - `getWorkstreamParticipants`
+- Signature utilities:
+  - `generateSignatureHeaders`
+  - `validateSignatureHeaders`
+- PAT helpers (`PatHelpers`):
+  - `signHashWithPAT`, `submitTransactionWithPAT`, `validateSignatureWithPAT`
+  - `fetchWorkstream`, `fetchWorkstreamInteractions`, `fetchWorkstreamParticipants`
+- Session validation helper:
+  - `SessionValidator.validateSession`
+
+## Optional Heartbeat
 
 ```java
 Config config = Config.builder()
@@ -69,23 +73,12 @@ Config config = Config.builder()
     .clientSecret("secret")
     .sessionHeartbeatInterval(Duration.ofMinutes(2))
     .build();
-
-OperonClient client = new OperonClient(config);
-client.init(); // heartbeat starts automatically
 ```
 
-## Features
+When enabled, the SDK pings `/v1/session/heartbeat` and forces token refresh on `401`.
 
-- Client‑credentials token provider with proactive refresh
-- Interaction/participant catalogue caching
-- Optional self‑sign workflow for payload hashes
-- Strongly typed models and unit tests
+## Build and Test
 
-## Requirements
-
-- Java 17 or 21 (LTS)
-- Maven 3.9+
-
-—
-
-Looking for more? Visit the Operon.Cloud Developers hub: https://www.operon.cloud/developers
+```bash
+mvn -f java/pom.xml clean test
+```

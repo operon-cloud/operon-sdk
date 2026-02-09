@@ -9,7 +9,7 @@ import java.util.List;
 public final class Token {
     private final String accessToken;
     private final String participantDid;
-    private final String channelId;
+    private final String workstreamId;
     private final String customerId;
     private final String workspaceId;
     private final String email;
@@ -19,12 +19,16 @@ public final class Token {
     private final String memberId;
     private final String sessionId;
     private final String orgId;
+    private final String participantId;
+    private final String clientId;
+    private final String authorizedParty;
+    private final long expiresAtUnix;
     private final Instant expiry;
 
     public Token(
         String accessToken,
         String participantDid,
-        String channelId,
+        String workstreamId,
         String customerId,
         String workspaceId,
         String email,
@@ -34,11 +38,15 @@ public final class Token {
         String memberId,
         String sessionId,
         String orgId,
+        String participantId,
+        String clientId,
+        String authorizedParty,
+        long expiresAtUnix,
         Instant expiry
     ) {
         this.accessToken = accessToken;
         this.participantDid = participantDid;
-        this.channelId = channelId;
+        this.workstreamId = workstreamId;
         this.customerId = customerId;
         this.workspaceId = workspaceId;
         this.email = email;
@@ -48,6 +56,10 @@ public final class Token {
         this.memberId = memberId;
         this.sessionId = sessionId;
         this.orgId = orgId;
+        this.participantId = participantId;
+        this.clientId = clientId;
+        this.authorizedParty = authorizedParty;
+        this.expiresAtUnix = expiresAtUnix;
         this.expiry = expiry;
     }
 
@@ -59,8 +71,15 @@ public final class Token {
         return participantDid;
     }
 
+    public String getWorkstreamId() {
+        return workstreamId;
+    }
+
+    /**
+     * Legacy alias for backward compatibility.
+     */
     public String getChannelId() {
-        return channelId;
+        return workstreamId;
     }
 
     public String getCustomerId() {
@@ -97,6 +116,22 @@ public final class Token {
 
     public String getOrgId() {
         return orgId;
+    }
+
+    public String getParticipantId() {
+        return participantId;
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public String getAuthorizedParty() {
+        return authorizedParty;
+    }
+
+    public long getExpiresAtUnix() {
+        return expiresAtUnix;
     }
 
     public Instant getExpiry() {
