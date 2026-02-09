@@ -65,3 +65,28 @@ All notable SDK changes are documented in this file.
   - `PatHelpers.fetchWorkstream*` helpers
   - `SessionValidator.validateSession`
 - Refreshed Java documentation and examples to match the current API behavior.
+
+### Node.js SDK
+
+- Upgraded Node SDK to functional parity with Go `v1.3.0`.
+- Migrated transaction/catalog flows to workstream-era APIs while preserving channel aliases:
+  - reference data now loads from `/v1/interactions` and `/v1/participants`
+  - workstream APIs now support `/v1/workstreams/{workstreamId}/...`
+  - `channelId` remains supported as a compatibility alias for `workstreamId`
+- Expanded transaction request/response models with parity fields:
+  - actor/assignee attribution (`actorExternal*`, `assigneeExternal*`)
+  - state fields (`state`, `stateId`, `stateLabel`)
+  - ROI compatibility fields (`roiBaseCost`, `roiBaseTime`, `roiCostSaving`, `roiTimeSaving`)
+  - context fields (`customerId`, `workspaceId`, `createdBy`)
+- Added client-side validation parity:
+  - actor source required when actor id/display is provided
+  - assignee source required when assignee id/display is provided
+  - legacy ROI values cannot be negative
+- Added client workstream/signature parity methods:
+  - `getWorkstream`, `getWorkstreamInteractions`, `getWorkstreamParticipants`
+  - `generateSignatureHeaders`, `validateSignatureHeaders`
+- Added PAT/session parity helpers:
+  - `signHashWithPAT`, `submitTransactionWithPAT`, `validateSignatureWithPAT`
+  - `fetchWorkstream`, `fetchWorkstreamInteractions`, `fetchWorkstreamParticipants`
+  - `validateSession`
+- Added Node tests for parity surfaces and updated existing suites for workstream-first semantics.

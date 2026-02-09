@@ -2,16 +2,31 @@ import type { InteractionSummary, ParticipantSummary } from '../types.js';
 
 export interface InteractionMetadata {
   id: string;
-  channelId: string;
+  workstreamId: string;
+  workstreamName?: string;
+  name?: string;
+  description?: string;
+  status?: string;
   sourceParticipantId: string;
   targetParticipantId: string;
   sourceDid?: string;
   targetDid?: string;
+  type?: string;
+  actor?: string;
+  states?: string[];
+  roiClassification?: string;
+  roiCost?: number;
+  roiTime?: number;
 }
 
 export interface ParticipantMetadata {
   id: string;
   did: string;
+  name?: string;
+  status?: string;
+  customerId?: string;
+  workstreamId?: string;
+  workstreamName?: string;
 }
 
 /**
@@ -27,7 +42,10 @@ export class Registry {
       if (!item.id) {
         continue;
       }
-      this.interactions.set(item.id, { ...item });
+      this.interactions.set(item.id, {
+        ...item,
+        states: item.states ? [...item.states] : undefined
+      });
     }
   }
 
@@ -43,24 +61,46 @@ export class Registry {
 
   interaction(id: string): InteractionMetadata | undefined {
     const metadata = this.interactions.get(id);
-    return metadata ? { ...metadata } : undefined;
+    return metadata
+      ? {
+          ...metadata,
+          states: metadata.states ? [...metadata.states] : undefined
+        }
+      : undefined;
   }
 
   interactionsList(): InteractionSummary[] {
     return Array.from(this.interactions.values()).map((item) => ({
       id: item.id,
-      channelId: item.channelId,
+      workstreamId: item.workstreamId,
+      channelId: item.workstreamId,
+      workstreamName: item.workstreamName,
+      name: item.name,
+      description: item.description,
+      status: item.status,
       sourceParticipantId: item.sourceParticipantId,
       targetParticipantId: item.targetParticipantId,
       sourceDid: item.sourceDid,
-      targetDid: item.targetDid
+      targetDid: item.targetDid,
+      type: item.type,
+      actor: item.actor,
+      states: item.states ? [...item.states] : undefined,
+      roiClassification: item.roiClassification,
+      roiCost: item.roiCost,
+      roiTime: item.roiTime
     }));
   }
 
   participantsList(): ParticipantSummary[] {
     return Array.from(this.participants.values()).map((item) => ({
       id: item.id,
-      did: item.did
+      did: item.did,
+      name: item.name,
+      status: item.status,
+      customerId: item.customerId,
+      workstreamId: item.workstreamId,
+      channelId: item.workstreamId,
+      workstreamName: item.workstreamName
     }));
   }
 }

@@ -12,7 +12,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 > **SDK Coverage**  
 > ✅ Go (1.3.0)  
 > ✅ Java (1.3.0)  
-> ✅ Node.js (1.0.1)  
+> ✅ Node.js (1.3.0)  
 > ✅ .NET (1.0.1)  
 > ✅ Rust (1.0.1)  
 > ✅ Python (1.3.0)
@@ -228,6 +228,8 @@ npm run build
 ```
 
 The build emits ESM output with bundled type declarations, and the Vitest suite covers configuration validation, token lifecycle management, and transaction submission (including automatic signing and manual signature paths).
+
+Node `v1.3.0` also includes parity helpers for PAT-based signing/submission, workstream datasets, session validation, and actor/assignee transaction attribution fields.
 
 ---
 

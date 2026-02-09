@@ -2,6 +2,13 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { OperonClient } from '../src/client.js';
 import { createConfig } from '../src/config.js';
+import {
+  HEADER_OPERON_DID,
+  HEADER_OPERON_PAYLOAD_HASH,
+  HEADER_OPERON_SIGNATURE,
+  HEADER_OPERON_SIGNATURE_ALGO,
+  HEADER_OPERON_SIGNATURE_KEY
+} from '../src/transactions.js';
 
 const BASE_URL = 'https://api.example.com/client-api';
 const TOKEN_URL = 'https://auth.example.com/oauth/token';
@@ -13,17 +20,21 @@ function buildResponse(body: unknown, status = 200): Response {
   });
 }
 
+function buildToken(claims: Record<string, unknown>): string {
+  return `header.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.sig`;
+}
+
 describe('OperonClient', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  test('submits transaction with self-signing and reference hydration', async () => {
+  test('submits transaction with self-signing and actor/assignee fields', async () => {
     const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
     const interactions = [
       {
         id: 'int-123',
-        channelId: 'chnl-1',
+        workstreamId: 'wstr-1',
         sourceParticipantId: 'part-1',
         targetParticipantId: 'part-2'
       }
@@ -33,35 +44,24 @@ describe('OperonClient', () => {
       { id: 'part-2', did: 'did:example:target' }
     ];
 
-    const tokenPayload = {
-      participant_did: 'did:example:cached',
-      channel_id: 'chnl-cached'
-    };
-
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       fetchCalls.push({ url, init });
 
       if (url === TOKEN_URL) {
         return buildResponse({
-          access_token: `header.${Buffer.from(JSON.stringify(tokenPayload)).toString('base64url')}.sig`,
+          access_token: buildToken({ participant_did: 'did:example:cached', workstream_id: 'wstr-1' }),
           token_type: 'Bearer',
           expires_in: 300
         });
       }
 
-      if (url === `${BASE_URL}/v1/channels/chnl-cached/interactions`) {
-        return buildResponse({ interactions, totalCount: interactions.length, page: 1, pageSize: 50, hasMore: false });
+      if (url === `${BASE_URL}/v1/interactions`) {
+        return buildResponse({ data: interactions });
       }
 
-      if (url === `${BASE_URL}/v1/channels/chnl-cached/participants`) {
-        return buildResponse({
-          participants,
-          totalCount: participants.length,
-          page: 1,
-          pageSize: 50,
-          hasMore: false
-        });
+      if (url === `${BASE_URL}/v1/participants`) {
+        return buildResponse({ data: participants });
       }
 
       if (url === `${BASE_URL}/v1/dids/self/sign`) {
@@ -69,13 +69,23 @@ describe('OperonClient', () => {
           signature: {
             algorithm: 'EdDSA',
             value: 'signed-value',
-            keyId: 'did:example:source#keys-1'
+            keyId: ''
           }
         });
       }
 
       if (url === `${BASE_URL}/v1/transactions`) {
         const body = init?.body ? JSON.parse(init.body as string) : {};
+        expect(body.workstreamId).toBe('wstr-1');
+        expect(body.sourceDid).toBe('did:example:source');
+        expect(body.targetDid).toBe('did:example:target');
+        expect(body.actorExternalId).toBe('agent-1');
+        expect(body.actorExternalDisplayName).toBe('Agent One');
+        expect(body.actorExternalSource).toBe('crm');
+        expect(body.assigneeExternalId).toBe('owner-2');
+        expect(body.assigneeExternalDisplayName).toBe('Owner Two');
+        expect(body.assigneeExternalSource).toBe('crm');
+
         return buildResponse({
           ...body,
           id: 'txn-123',
@@ -102,11 +112,18 @@ describe('OperonClient', () => {
     const result = await client.submitTransaction({
       correlationId: 'corr-1',
       interactionId: 'int-123',
-      payload: { foo: 'bar' }
+      payload: { foo: 'bar' },
+      actorExternalId: 'agent-1',
+      actorExternalDisplayName: 'Agent One',
+      actorExternalSource: 'crm',
+      assigneeExternalId: 'owner-2',
+      assigneeExternalDisplayName: 'Owner Two',
+      assigneeExternalSource: 'crm'
     });
 
     expect(result.id).toBe('txn-123');
     expect(result.signature.value).toBe('signed-value');
+    expect(result.signature.keyId).toBe('did:example:source#keys-1');
     expect(fetchImpl).toHaveBeenCalledTimes(5);
 
     const transactionCall = fetchCalls.find((call) => call.url.endsWith('/v1/transactions'));
@@ -116,105 +133,48 @@ describe('OperonClient', () => {
     expect(requestBody.payloadHash).toMatch(/^[A-Za-z0-9_-]+$/);
   });
 
-  test('generates Operon signature headers using managed keys', async () => {
-    const tokenPayload = {
-      participant_did: 'did:example:signer',
-      channel_id: 'chnl-sign'
-    };
-
+  test('uses provided signature when self signing disabled with channel alias', async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-
       if (url === TOKEN_URL) {
         return buildResponse({
-          access_token: `header.${Buffer.from(JSON.stringify(tokenPayload)).toString('base64url')}.sig`,
+          access_token: buildToken({}),
           token_type: 'Bearer',
           expires_in: 300
         });
       }
-
-      if (url === `${BASE_URL}/v1/dids/self/sign`) {
-        const body = init?.body ? JSON.parse(init.body as string) : {};
-        expect(body.payloadHash).toBeDefined();
+      if (url === `${BASE_URL}/v1/interactions`) {
         return buildResponse({
-          signature: {
-            algorithm: 'EdDSA',
-            value: 'signed-value',
-            keyId: 'did:example:signer#keys-1'
-          }
-        });
-      }
-
-      throw new Error(`unexpected fetch call to ${url}`);
-    });
-
-    const client = new OperonClient(
-      createConfig({
-        baseUrl: BASE_URL,
-        tokenUrl: TOKEN_URL,
-        clientId: 'client',
-        clientSecret: 'secret',
-        fetchImpl
-      })
-    );
-
-    const headers = await client.generateSignatureHeaders({ foo: 'bar' });
-    expect(headers['X-Operon-DID']).toBe('did:example:signer');
-    expect(headers['X-Operon-Payload-Hash']).toMatch(/^[A-Za-z0-9_-]+$/);
-    expect(headers['X-Operon-Signature']).toBe('signed-value');
-    expect(headers['X-Operon-Signature-KeyId']).toBe('did:example:signer#keys-1');
-    expect(headers['X-Operon-Signature-Alg']).toBe('EdDSA');
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-  });
-
-  test('uses provided signature when self signing disabled', async () => {
-    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-      if (url === TOKEN_URL) {
-        return buildResponse({
-          access_token: `header.${Buffer.from(JSON.stringify({})).toString('base64url')}.sig`,
-          token_type: 'Bearer',
-          expires_in: 300
-        });
-      }
-      if (url === `${BASE_URL}/v1/channels/chnl-override/interactions`) {
-        return buildResponse({
-          interactions: [
+          data: [
             {
               id: 'int-manual',
-              channelId: 'chnl-override',
+              workstreamId: 'wstr-override',
               sourceParticipantId: 'part-1',
               targetParticipantId: 'part-2'
             }
-          ],
-          totalCount: 1,
-          page: 1,
-          pageSize: 50,
-          hasMore: false
+          ]
         });
       }
-      if (url === `${BASE_URL}/v1/channels/chnl-override/participants`) {
+      if (url === `${BASE_URL}/v1/participants`) {
         return buildResponse({
-          participants: [
+          data: [
             { id: 'part-1', did: 'did:example:src' },
             { id: 'part-2', did: 'did:example:dst' }
-          ],
-          totalCount: 2,
-          page: 1,
-          pageSize: 50,
-          hasMore: false
+          ]
         });
       }
       if (url === `${BASE_URL}/v1/transactions`) {
+        const body = JSON.parse((init?.body as string) || '{}');
+        expect(body.workstreamId).toBe('wstr-override');
         return buildResponse({
           id: 'txn-456',
           correlationId: 'corr-2',
-          channelId: 'chnl-override',
+          workstreamId: 'wstr-override',
           interactionId: 'int-manual',
           sourceDid: 'did:example:src',
           targetDid: 'did:example:dst',
           signature: { algorithm: 'EdDSA', value: 'manual', keyId: 'did:example:src#keys-1' },
-          payloadHash: 'hash',
+          payloadHash: body.payloadHash,
           status: 'PENDING',
           timestamp: '2025-01-01T00:00:00Z',
           createdAt: '2025-01-01T00:00:00Z',
@@ -237,16 +197,149 @@ describe('OperonClient', () => {
 
     const result = await client.submitTransaction({
       correlationId: 'corr-2',
-      channelId: 'chnl-override',
+      channelId: 'wstr-override',
       interactionId: 'int-manual',
       sourceDid: 'did:example:src',
       targetDid: 'did:example:dst',
-      payloadHash: 'existing-hash',
+      payloadHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       signature: { algorithm: 'EdDSA', value: 'manual' }
     });
 
     expect(result.signature.value).toBe('manual');
+    expect(result.workstreamId).toBe('wstr-override');
+    expect(result.channelId).toBe('wstr-override');
     expect(fetchImpl).toHaveBeenCalledTimes(4);
+  });
+
+  test('generates and validates Operon signature headers', async () => {
+    const payload = Buffer.from('{"demo":true}', 'utf-8');
+
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url === TOKEN_URL) {
+        return buildResponse({
+          access_token: buildToken({ participant_did: 'did:example:signer', workstream_id: 'wstr-sign' }),
+          token_type: 'Bearer',
+          expires_in: 300
+        });
+      }
+
+      if (url === `${BASE_URL}/v1/dids/self/sign`) {
+        return buildResponse({
+          signature: {
+            algorithm: 'ES256',
+            value: 'signed-value',
+            keyId: 'did:example:signer#keys-1'
+          }
+        });
+      }
+
+      if (url === `${BASE_URL}/v1/dids/did%3Aexample%3Asigner/signature/verify`) {
+        return buildResponse({
+          status: 'VALID',
+          message: 'ok',
+          did: 'did:example:signer',
+          payloadHash: 'placeholder',
+          algorithm: 'ES256',
+          keyId: 'did:example:signer#keys-1'
+        });
+      }
+
+      throw new Error(`unexpected fetch call to ${url}`);
+    });
+
+    const client = new OperonClient(
+      createConfig({
+        baseUrl: BASE_URL,
+        tokenUrl: TOKEN_URL,
+        clientId: 'client',
+        clientSecret: 'secret',
+        signingAlgorithm: 'ES256',
+        fetchImpl
+      })
+    );
+
+    const headers = await client.generateSignatureHeaders(payload);
+    expect(headers[HEADER_OPERON_DID]).toBe('did:example:signer');
+    expect(headers[HEADER_OPERON_PAYLOAD_HASH]).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(headers[HEADER_OPERON_SIGNATURE]).toBe('signed-value');
+    expect(headers[HEADER_OPERON_SIGNATURE_KEY]).toBe('did:example:signer#keys-1');
+    expect(headers[HEADER_OPERON_SIGNATURE_ALGO]).toBe('ES256');
+
+    const result = await client.validateSignatureHeaders(payload, headers);
+    expect(result.status).toBe('VALID');
+  });
+
+  test('validateSignatureHeaders rejects payload hash mismatch', async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === TOKEN_URL) {
+        return buildResponse({
+          access_token: buildToken({ participant_did: 'did:example:signer' }),
+          token_type: 'Bearer',
+          expires_in: 300
+        });
+      }
+      throw new Error(`unexpected fetch call to ${url}`);
+    });
+
+    const client = new OperonClient(
+      createConfig({
+        baseUrl: BASE_URL,
+        tokenUrl: TOKEN_URL,
+        clientId: 'client',
+        clientSecret: 'secret',
+        fetchImpl
+      })
+    );
+
+    await expect(
+      client.validateSignatureHeaders(Buffer.from('payload', 'utf-8'), {
+        [HEADER_OPERON_DID]: 'did:example:signer',
+        [HEADER_OPERON_PAYLOAD_HASH]: 'mismatch',
+        [HEADER_OPERON_SIGNATURE]: 'sig',
+        [HEADER_OPERON_SIGNATURE_KEY]: 'did:example:signer#keys-1',
+        [HEADER_OPERON_SIGNATURE_ALGO]: 'EdDSA'
+      })
+    ).rejects.toThrow('payload hash mismatch');
+  });
+
+  test('getWorkstreamInteractions uses token-scoped workstream by default', async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === TOKEN_URL) {
+        return buildResponse({
+          access_token: buildToken({ participant_did: 'did:example:source', workstream_id: 'wstr-abc' }),
+          token_type: 'Bearer',
+          expires_in: 300
+        });
+      }
+      if (url === `${BASE_URL}/v1/workstreams/wstr-abc/interactions`) {
+        return buildResponse({
+          interactions: [{ id: 'int-1', workstreamId: 'wstr-abc' }],
+          totalCount: 1,
+          page: 1,
+          pageSize: 1000,
+          hasMore: false
+        });
+      }
+      throw new Error(`unexpected fetch call to ${url}`);
+    });
+
+    const client = new OperonClient(
+      createConfig({
+        baseUrl: BASE_URL,
+        tokenUrl: TOKEN_URL,
+        clientId: 'client',
+        clientSecret: 'secret',
+        fetchImpl
+      })
+    );
+
+    const response = await client.getWorkstreamInteractions();
+    expect(response.interactions).toHaveLength(1);
+    expect(response.interactions[0].id).toBe('int-1');
   });
 
   test('heartbeat forces token refresh when unauthorized', async () => {
@@ -291,14 +384,17 @@ describe('OperonClient', () => {
     await new Promise((resolve) => setTimeout(resolve, 60));
     await client.close();
 
-    expect(fetchImpl).toHaveBeenCalled();
     const heartbeatHits = fetchImpl.mock.calls.filter(
-      ([input]) => (typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url) === heartbeatUrl
+      ([input]) =>
+        (typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url) ===
+        heartbeatUrl
     );
     expect(heartbeatHits.length).toBeGreaterThanOrEqual(1);
-    // First PAT during init + forced refresh after 401 heartbeat.
+
     const tokenHits = fetchImpl.mock.calls.filter(
-      ([input]) => (typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url) === TOKEN_URL
+      ([input]) =>
+        (typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url) ===
+        TOKEN_URL
     );
     expect(tokenHits.length).toBeGreaterThanOrEqual(2);
   });

@@ -16,9 +16,10 @@ describe('ClientCredentialsManager', () => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       calls.push({ url, init });
       const body = JSON.stringify({
-        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
+        access_token:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
           Buffer.from(
-            JSON.stringify({ participant_did: 'did:example:123', channel_id: 'chnl-1' })
+            JSON.stringify({ participant_did: 'did:example:123', workstream_id: 'wstr-1' })
           ).toString('base64url') +
           '.sig',
         token_type: 'Bearer',
@@ -44,7 +45,8 @@ describe('ClientCredentialsManager', () => {
     expect(first.accessToken).toBe(second.accessToken);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(first.participantDid).toBe('did:example:123');
-    expect(first.channelId).toBe('chnl-1');
+    expect(first.workstreamId).toBe('wstr-1');
+    expect(first.channelId).toBe('wstr-1');
 
     manager.clear();
     await manager.token();
@@ -53,14 +55,44 @@ describe('ClientCredentialsManager', () => {
     expect(calls[0].init?.method).toBe('POST');
   });
 
+  test('uses legacy channel_id claim when workstream_id is absent', async () => {
+    const fetchImpl = vi.fn(async () => {
+      const payload = {
+        access_token:
+          'header.' +
+          Buffer.from(JSON.stringify({ participant_did: 'did:example:abc', channel_id: 'chnl-1' })).toString(
+            'base64url'
+          ) +
+          '.sig',
+        token_type: 'Bearer',
+        expires_in: 300
+      };
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    });
+
+    const manager = new ClientCredentialsManager(
+      createConfig({
+        clientId: 'client',
+        clientSecret: 'secret',
+        tokenUrl: TOKEN_URL,
+        fetchImpl
+      })
+    );
+
+    const token = await manager.token();
+    expect(token.workstreamId).toBe('chnl-1');
+    expect(token.channelId).toBe('chnl-1');
+  });
+
   test('refreshes token when expired', async () => {
     let counter = 0;
     const fetchImpl = vi.fn(async () => {
       counter += 1;
       const payload = {
-        access_token: `header.${Buffer.from(
-          JSON.stringify({})
-        ).toString('base64url')}.${counter}`,
+        access_token: `header.${Buffer.from(JSON.stringify({})).toString('base64url')}.${counter}`,
         token_type: 'Bearer',
         expires_in: 1
       };

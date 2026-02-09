@@ -1,16 +1,16 @@
 # Operon Node.js SDK
 
-Enterprise-ready JavaScript/TypeScript client for the [Operon.Cloud](https://www.operon.cloud) platform. This SDK mirrors the ergonomics of the Go and Java packages while embracing modern Node.js conventions (ES modules, strict TypeScript typings, fetch-based networking).
+Enterprise-ready JavaScript/TypeScript client for the [Operon.Cloud](https://www.operon.cloud) platform.
 
 ## Compatibility
 
-- **Node.js**: 20.x or 22.x LTS (uses the built-in Fetch API and `AbortController`)
-- **TypeScript**: 5.8+
+- Node.js: 20.x or 22.x LTS
+- TypeScript: 5.8+
 
 ## Installation
 
 ```bash
-npm install @operoncloud/operon-sdk
+npm install @operoncloud/operon-sdk@1.3.0
 ```
 
 ## Quick Start
@@ -18,11 +18,12 @@ npm install @operoncloud/operon-sdk
 ```ts
 import { OperonClient, createConfig } from '@operoncloud/operon-sdk';
 
-const client = new OperonClient(createConfig({
-  clientId: process.env.OPERON_CLIENT_ID!,
-  clientSecret: process.env.OPERON_CLIENT_SECRET!,
-  // Base URL / Token URL fall back to production endpoints; override for dev/qa when needed.
-}));
+const client = new OperonClient(
+  createConfig({
+    clientId: process.env.OPERON_CLIENT_ID!,
+    clientSecret: process.env.OPERON_CLIENT_SECRET!
+  })
+);
 
 await client.init();
 
@@ -30,79 +31,68 @@ const txn = await client.submitTransaction({
   correlationId: 'lead-abc',
   interactionId: 'int-123',
   payload: { leadId: 'lead-abc' },
+  state: 'Qualified',
+  actorExternalId: 'agent-12',
+  actorExternalDisplayName: 'Agent 12',
+  actorExternalSource: 'crm',
+  assigneeExternalId: 'owner-2',
+  assigneeExternalDisplayName: 'Owner Two',
+  assigneeExternalSource: 'crm'
 });
 
-console.log(txn.id, txn.status);
+console.log(txn.id, txn.status, txn.workstreamId);
 await client.close();
 ```
 
-> **Security note**
-> The Node.js SDK mirrors the Go client: it computes a SHA-256 hash of any payload you provide and only transmits the hash (`payloadHash`) to Operon. Raw payload bytes stay inside your service boundary.
+`payload` is hashed client-side (`SHA-256`) and only `payloadHash` is sent to Operon.
 
-### Keep sessions warm (optional heartbeat)
-
-Long-running daemons can proactively validate their PAT by enabling the heartbeat poller. When the server reports `401`, the SDK immediately mints a new PAT via your stored client credentials so the next API call succeeds.
+## Workstream Data APIs
 
 ```ts
-const client = new OperonClient(createConfig({
-  clientId: process.env.OPERON_CLIENT_ID!,
-  clientSecret: process.env.OPERON_CLIENT_SECRET!,
-  sessionHeartbeatIntervalMs: 120_000, // ping every 2 minutes
-}));
-
-await client.init(); // starts the heartbeat loop
-// ...
-await client.close(); // stops the loop
+const workstream = await client.getWorkstream();
+const interactions = await client.getWorkstreamInteractions();
+const participants = await client.getWorkstreamParticipants();
 ```
 
-### Generate Operon Headers
-
-Need to call a downstream API with Operon-managed signatures? Use `generateSignatureHeaders` to obtain the DID headers without manually constructing payload hashes:
+## Signature APIs
 
 ```ts
-const headers = await client.generateSignatureHeaders(JSON.stringify(body));
-fetch(targetUrl, {
-  method: 'POST',
-  body: JSON.stringify(body),
-  headers: {
-    ...headers,
-    'Content-Type': 'application/json'
-  }
-});
+const headers = await client.generateSignatureHeaders(JSON.stringify(body), 'ES256');
+
+const result = await client.validateSignatureHeaders(
+  JSON.stringify(body),
+  headers
+);
 ```
+
+## PAT and Session Helpers
+
+The SDK includes PAT-only utilities when you already have a Personal Access Token.
+
+```ts
+import {
+  signHashWithPAT,
+  submitTransactionWithPAT,
+  fetchWorkstreamInteractions,
+  validateSignatureWithPAT,
+  validateSession
+} from '@operoncloud/operon-sdk';
+```
+
+These helpers match the Go/Python/Java v1.3.0 surface for signing, submission, workstream fetches, signature validation, and PAT session validation.
+
+## Legacy Channel Compatibility
+
+`channelId` is retained as a compatibility alias for `workstreamId` in request/response models and token claims.
 
 ## Scripts
 
 ```bash
-npm run lint   # ESLint (TypeScript aware)
-npm test       # vitest unit tests
-npm run build  # Type declarations + transpiled ESM output in dist/
-```
-
-## Folder Structure
-
-```
-node/
-├── src/
-│   ├── auth/           # Client credentials manager
-│   ├── catalog/        # Reference data registry (interactions/participants)
-│   ├── http/           # Fetch helpers with timeouts
-│   ├── signing/        # Self-signing client
-│   ├── config.ts       # Config validation + defaults
-│   ├── client.ts       # High-level Operon client
-│   ├── errors.ts       # SDK error hierarchy + API error decoder
-│   ├── types.ts        # Shared interfaces (transactions, signatures, etc.)
-│   └── index.ts        # Public exports
-├── test/               # Vitest suites
-├── package.json
-├── tsconfig.json
-└── README.md
+npm run lint
+npm test
+npm run build
 ```
 
 ## License
 
 Apache-2.0 — see [LICENSE](../LICENSE).
-
-—
-
-For more resources and SDKs in other languages, visit Operon.Cloud Developers: https://www.operon.cloud/developers

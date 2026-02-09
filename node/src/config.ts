@@ -1,4 +1,8 @@
-import { DEFAULT_SIGNING_ALGORITHM, type FetchFunction } from './types.js';
+import {
+  DEFAULT_SIGNING_ALGORITHM,
+  canonicalSigningAlgorithm,
+  type FetchFunction
+} from './types.js';
 
 /**
  * Production API base used when no override is supplied.
@@ -95,6 +99,18 @@ function ensureFetch(fetchImpl?: FetchFunction): FetchFunction {
   throw new Error('fetch implementation is required; supply fetchImpl when global fetch is unavailable');
 }
 
+function ensureURL(url: string, fieldName: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.protocol || !parsed.host) {
+      throw new Error('missing protocol or host');
+    }
+    return url;
+  } catch (error) {
+    throw new Error(`invalid ${fieldName}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 /**
  * Normalises user configuration, fills defaults, and performs basic validation.
  *
@@ -115,30 +131,44 @@ export function createConfig(input: OperonConfigInput): OperonConfig {
     throw new Error('clientSecret is required');
   }
 
-  const baseUrl = trimAndRemoveTrailingSlash(input.baseUrl, DEFAULT_BASE_URL);
-  const tokenUrl = trimAndRemoveTrailingSlash(input.tokenUrl, DEFAULT_TOKEN_URL);
+  const baseUrl = ensureURL(trimAndRemoveTrailingSlash(input.baseUrl, DEFAULT_BASE_URL), 'baseUrl');
+  const tokenUrl = ensureURL(trimAndRemoveTrailingSlash(input.tokenUrl, DEFAULT_TOKEN_URL), 'tokenUrl');
 
   const httpTimeoutMs =
     input.httpTimeoutMs && input.httpTimeoutMs > 0 ? input.httpTimeoutMs : DEFAULT_HTTP_TIMEOUT_MS;
   const tokenLeewayMs =
     input.tokenLeewayMs && input.tokenLeewayMs > 0 ? input.tokenLeewayMs : DEFAULT_TOKEN_LEEWAY_MS;
-  const signingAlgorithm = input.signingAlgorithm?.trim() ?? DEFAULT_SIGNING_ALGORITHM;
+
+  const requestedAlgorithm = input.signingAlgorithm?.trim() || DEFAULT_SIGNING_ALGORITHM;
+  const normalizedAlgorithm = canonicalSigningAlgorithm(requestedAlgorithm);
+  if (!normalizedAlgorithm) {
+    throw new Error(`unsupported signingAlgorithm ${requestedAlgorithm}`);
+  }
+
   const scope = input.scope?.trim() || undefined;
   const audience =
     input.audience?.map((aud) => aud.trim()).filter((aud) => aud.length > 0) ?? [];
-  const sessionHeartbeatIntervalMs =
-    input.sessionHeartbeatIntervalMs && input.sessionHeartbeatIntervalMs > 0
-      ? input.sessionHeartbeatIntervalMs
-      : 0;
-  const sessionHeartbeatTimeoutMs =
-    input.sessionHeartbeatTimeoutMs && input.sessionHeartbeatTimeoutMs > 0
-      ? input.sessionHeartbeatTimeoutMs
-      : DEFAULT_HEARTBEAT_TIMEOUT_MS;
-  const sessionHeartbeatUrl = resolveHeartbeatUrl(
-    sessionHeartbeatIntervalMs,
-    input.sessionHeartbeatUrl,
-    baseUrl
-  );
+
+  const interval = input.sessionHeartbeatIntervalMs ?? 0;
+  if (interval < 0) {
+    throw new Error('sessionHeartbeatIntervalMs cannot be negative');
+  }
+
+  let sessionHeartbeatIntervalMs = 0;
+  let sessionHeartbeatTimeoutMs = 0;
+  let sessionHeartbeatUrl: string | undefined;
+  if (interval > 0) {
+    sessionHeartbeatIntervalMs = interval;
+    sessionHeartbeatTimeoutMs =
+      input.sessionHeartbeatTimeoutMs && input.sessionHeartbeatTimeoutMs > 0
+        ? input.sessionHeartbeatTimeoutMs
+        : DEFAULT_HEARTBEAT_TIMEOUT_MS;
+    const rawHeartbeat = trimAndRemoveTrailingSlash(
+      input.sessionHeartbeatUrl,
+      `${baseUrl}/v1/session/heartbeat`
+    );
+    sessionHeartbeatUrl = ensureURL(rawHeartbeat, 'sessionHeartbeatUrl');
+  }
 
   return {
     baseUrl,
@@ -150,26 +180,11 @@ export function createConfig(input: OperonConfigInput): OperonConfig {
     httpTimeoutMs,
     fetchImpl: ensureFetch(input.fetchImpl),
     disableSelfSign: Boolean(input.disableSelfSign),
-    signingAlgorithm,
+    signingAlgorithm: normalizedAlgorithm,
     tokenLeewayMs,
     logger: input.logger ?? noopLogger,
     sessionHeartbeatIntervalMs,
     sessionHeartbeatTimeoutMs,
     sessionHeartbeatUrl
   };
-}
-
-function resolveHeartbeatUrl(
-  intervalMs: number,
-  customUrl: string | undefined,
-  baseUrl: string
-): string | undefined {
-  if (intervalMs <= 0) {
-    return undefined;
-  }
-  const trimmed = customUrl?.trim();
-  if (trimmed) {
-    return trimAndRemoveTrailingSlash(trimmed, trimmed);
-  }
-  return `${baseUrl}/v1/session/heartbeat`;
 }

@@ -2,6 +2,8 @@ import type { OperonConfig } from '../config.js';
 import { decodeApiError } from '../errors.js';
 import type { AccessToken } from '../types.js';
 
+import { decodeTokenClaims } from './claims.js';
+
 interface TokenResponse {
   access_token: string;
   token_type: string;
@@ -119,10 +121,26 @@ export class ClientCredentialsManager implements TokenManager {
       }
 
       const expiresIn = Math.max(1, payload.expires_in ?? 60);
+      const claims = decodeTokenClaims(payload.access_token);
       const accessToken: AccessToken = {
         accessToken: payload.access_token.trim(),
         expiresAt: new Date(Date.now() + expiresIn * 1000),
-        ...this.extractClaims(payload.access_token)
+        participantDid: claims.participantDid,
+        workstreamId: claims.workstreamId,
+        channelId: claims.workstreamId,
+        customerId: claims.customerId,
+        workspaceId: claims.workspaceId,
+        email: claims.email,
+        name: claims.name,
+        tenantIds: claims.tenantIds,
+        roles: claims.roles,
+        memberId: claims.memberId,
+        sessionId: claims.sessionId,
+        orgId: claims.orgId,
+        participantId: claims.participantId,
+        clientId: claims.clientId,
+        authorizedParty: claims.authorizedParty,
+        expiresAtUnix: claims.expiresAtUnix
       };
       return accessToken;
     } finally {
@@ -132,33 +150,6 @@ export class ClientCredentialsManager implements TokenManager {
 
   private isLegacyEndpoint(): boolean {
     return this.config.tokenUrl.includes('/v1/session/m2m');
-  }
-
-  private extractClaims(token: string) {
-    const parts = token.split('.');
-    if (parts.length < 2) {
-      return {};
-    }
-
-    try {
-      const payloadSegment = base64UrlDecode(parts[1]);
-      const payload = JSON.parse(payloadSegment.toString('utf-8')) as Record<string, unknown>;
-      return {
-        participantDid: readString(payload, 'participant_did'),
-        channelId: readString(payload, 'channel_id'),
-        customerId: readString(payload, 'customer_id'),
-        workspaceId: readString(payload, 'workspace_id'),
-        email: readString(payload, 'email'),
-        name: readString(payload, 'name'),
-        tenantIds: readStringArray(payload, 'tenant_ids'),
-        roles: readStringArray(payload, 'roles'),
-        memberId: readString(payload, 'member_id'),
-        sessionId: readString(payload, 'session_id'),
-        orgId: readString(payload, 'org_id')
-      };
-    } catch {
-      return {};
-    }
   }
 }
 
@@ -171,36 +162,7 @@ function mergeSignals(primary: AbortSignal, secondary?: AbortSignal): AbortSigna
   }
   const controller = new AbortController();
   const abort = () => controller.abort();
-  primary.addEventListener('abort', abort);
-  secondary.addEventListener('abort', abort);
+  primary.addEventListener('abort', abort, { once: true });
+  secondary.addEventListener('abort', abort, { once: true });
   return controller.signal;
-}
-
-function base64UrlDecode(segment: string): Buffer {
-  let input = segment.replace(/-/g, '+').replace(/_/g, '/');
-  const padding = input.length % 4;
-  if (padding === 2) {
-    input += '==';
-  } else if (padding === 3) {
-    input += '=';
-  } else if (padding !== 0) {
-    input += '==='.slice(0, (4 - padding) % 4);
-  }
-  return Buffer.from(input, 'base64');
-}
-
-function readString(source: Record<string, unknown>, key: string): string | undefined {
-  const value = source[key];
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function readStringArray(source: Record<string, unknown>, key: string): string[] | undefined {
-  const value = source[key];
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-  const items = value
-    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-    .filter((entry) => entry.length > 0);
-  return items.length > 0 ? items : undefined;
 }

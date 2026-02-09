@@ -26,7 +26,7 @@ describe('createConfig', () => {
     expect(typeof config.fetchImpl).toBe('function');
     expect(config.logger).toBeDefined();
     expect(config.sessionHeartbeatIntervalMs).toBe(0);
-    expect(config.sessionHeartbeatTimeoutMs).toBe(DEFAULT_HEARTBEAT_TIMEOUT_MS);
+    expect(config.sessionHeartbeatTimeoutMs).toBe(0);
     expect(config.sessionHeartbeatUrl).toBeUndefined();
   });
 
@@ -65,7 +65,9 @@ describe('createConfig', () => {
 
   test('requires client credentials', () => {
     expect(() => createConfig({ clientId: '', clientSecret: '' })).toThrow('clientId is required');
-    expect(() => createConfig({ clientId: 'id', clientSecret: '' })).toThrow('clientSecret is required');
+    expect(() => createConfig({ clientId: 'id', clientSecret: '' })).toThrow(
+      'clientSecret is required'
+    );
   });
 
   test('derives heartbeat URL from base when enabled', () => {
@@ -78,5 +80,23 @@ describe('createConfig', () => {
 
     expect(config.sessionHeartbeatUrl).toBe('https://example/base/v1/session/heartbeat');
     expect(config.sessionHeartbeatTimeoutMs).toBe(DEFAULT_HEARTBEAT_TIMEOUT_MS);
+  });
+
+  test('rejects unsupported signing algorithm and negative heartbeat interval', () => {
+    expect(() =>
+      createConfig({
+        clientId: 'client',
+        clientSecret: 'secret',
+        signingAlgorithm: 'RS256'
+      })
+    ).toThrow('unsupported signingAlgorithm RS256');
+
+    expect(() =>
+      createConfig({
+        clientId: 'client',
+        clientSecret: 'secret',
+        sessionHeartbeatIntervalMs: -1
+      })
+    ).toThrow('sessionHeartbeatIntervalMs cannot be negative');
   });
 });
