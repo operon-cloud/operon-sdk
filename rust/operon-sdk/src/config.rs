@@ -3,11 +3,13 @@ use std::time::Duration;
 use reqwest::Url;
 use thiserror::Error;
 
-const DEFAULT_BASE_URL: &str = "https://api.operon.cloud/client-api/";
-const DEFAULT_TOKEN_URL: &str = "https://auth.operon.cloud/oauth2/token";
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
-const DEFAULT_TOKEN_LEEWAY: Duration = Duration::from_secs(30);
-const DEFAULT_HEARTBEAT_TIMEOUT: Duration = Duration::from_secs(10);
+use crate::models::{canonical_signing_algorithm, ALGORITHM_EDDSA};
+
+pub const DEFAULT_BASE_URL: &str = "https://api.operon.cloud/client-api/";
+pub const DEFAULT_TOKEN_URL: &str = "https://auth.operon.cloud/oauth2/token";
+pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+pub const DEFAULT_TOKEN_LEEWAY: Duration = Duration::from_secs(30);
+pub const DEFAULT_HEARTBEAT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone)]
 pub struct OperonConfig {
@@ -20,6 +22,7 @@ pub struct OperonConfig {
     pub http_timeout: Duration,
     pub token_leeway: Duration,
     pub disable_self_sign: bool,
+    pub signing_algorithm: String,
     pub session_heartbeat_interval: Duration,
     pub session_heartbeat_timeout: Duration,
     pub session_heartbeat_url: Option<Url>,
@@ -42,6 +45,7 @@ pub struct OperonConfigBuilder {
     http_timeout: Option<Duration>,
     token_leeway: Option<Duration>,
     disable_self_sign: bool,
+    signing_algorithm: Option<String>,
     session_heartbeat_interval: Option<Duration>,
     session_heartbeat_timeout: Option<Duration>,
     session_heartbeat_url: Option<Url>,
@@ -85,8 +89,8 @@ impl OperonConfigBuilder {
     {
         self.audience = values
             .into_iter()
-            .map(|s| s.into().trim().to_owned())
-            .filter(|s| !s.is_empty())
+            .map(|entry| entry.into().trim().to_owned())
+            .filter(|entry| !entry.is_empty())
             .collect();
         self
     }
@@ -103,6 +107,11 @@ impl OperonConfigBuilder {
 
     pub fn disable_self_sign(mut self, value: bool) -> Self {
         self.disable_self_sign = value;
+        self
+    }
+
+    pub fn signing_algorithm(mut self, value: impl Into<String>) -> Self {
+        self.signing_algorithm = Some(value.into());
         self
     }
 
@@ -126,7 +135,7 @@ impl OperonConfigBuilder {
             .client_id
             .ok_or(ConfigError::MissingField("client_id"))?
             .trim()
-            .to_owned();
+            .to_string();
         if client_id.is_empty() {
             return Err(ConfigError::MissingField("client_id"));
         }
@@ -135,7 +144,7 @@ impl OperonConfigBuilder {
             .client_secret
             .ok_or(ConfigError::MissingField("client_secret"))?
             .trim()
-            .to_owned();
+            .to_string();
         if client_secret.is_empty() {
             return Err(ConfigError::MissingField("client_secret"));
         }
@@ -144,23 +153,33 @@ impl OperonConfigBuilder {
             .base_url
             .unwrap_or_else(|| normalise_url(DEFAULT_BASE_URL));
         let token_url = self.token_url.unwrap_or_else(|| url(DEFAULT_TOKEN_URL));
+
         let http_timeout = self.http_timeout.unwrap_or(DEFAULT_TIMEOUT);
         let token_leeway = self.token_leeway.unwrap_or(DEFAULT_TOKEN_LEEWAY);
+
+        let algorithm = self
+            .signing_algorithm
+            .unwrap_or_else(|| ALGORITHM_EDDSA.to_string());
+        let signing_algorithm = canonical_signing_algorithm(&algorithm)
+            .ok_or_else(|| ConfigError::UnsupportedSigningAlgorithm(algorithm.clone()))?
+            .to_string();
 
         let heartbeat_interval = self
             .session_heartbeat_interval
             .unwrap_or(Duration::from_secs(0));
-        let heartbeat_timeout = self
-            .session_heartbeat_timeout
-            .unwrap_or(DEFAULT_HEARTBEAT_TIMEOUT);
-        let heartbeat_url = if heartbeat_interval > Duration::from_secs(0) {
-            Some(self.session_heartbeat_url.unwrap_or_else(|| {
-                let mut url = base_url.clone();
-                url.set_path("v1/session/heartbeat");
-                url
-            }))
+
+        let (heartbeat_timeout, heartbeat_url) = if heartbeat_interval > Duration::from_secs(0) {
+            let timeout = self
+                .session_heartbeat_timeout
+                .unwrap_or(DEFAULT_HEARTBEAT_TIMEOUT);
+            let url = self.session_heartbeat_url.unwrap_or_else(|| {
+                let mut built = base_url.clone();
+                built.set_path("v1/session/heartbeat");
+                built
+            });
+            (timeout, Some(url))
         } else {
-            None
+            (Duration::from_secs(0), None)
         };
 
         Ok(OperonConfig {
@@ -173,6 +192,7 @@ impl OperonConfigBuilder {
             http_timeout,
             token_leeway,
             disable_self_sign: self.disable_self_sign,
+            signing_algorithm,
             session_heartbeat_interval: heartbeat_interval,
             session_heartbeat_timeout: heartbeat_timeout,
             session_heartbeat_url: heartbeat_url,
@@ -184,14 +204,16 @@ impl OperonConfigBuilder {
 pub enum ConfigError {
     #[error("missing field: {0}")]
     MissingField(&'static str),
+    #[error("unsupported signing algorithm {0}")]
+    UnsupportedSigningAlgorithm(String),
 }
 
 fn normalise_url(value: impl AsRef<str>) -> Url {
-    let mut url = url(value);
-    if !url.as_str().ends_with('/') {
-        url.set_path(&format!("{}/", url.path()));
+    let mut parsed = url(value);
+    if !parsed.as_str().ends_with('/') {
+        parsed.set_path(&format!("{}/", parsed.path()));
     }
-    url
+    parsed
 }
 
 fn url(value: impl AsRef<str>) -> Url {

@@ -18,8 +18,9 @@ fn config_defaults() {
     );
     assert_eq!(config.http_timeout.as_secs(), 30);
     assert_eq!(config.token_leeway.as_secs(), 30);
+    assert_eq!(config.signing_algorithm, "EdDSA");
     assert_eq!(config.session_heartbeat_interval.as_secs(), 0);
-    assert_eq!(config.session_heartbeat_timeout.as_secs(), 10);
+    assert_eq!(config.session_heartbeat_timeout.as_secs(), 0);
     assert!(config.session_heartbeat_url.is_none());
 }
 
@@ -52,4 +53,19 @@ fn config_heartbeat_customisation() {
         config.session_heartbeat_url.unwrap().as_str(),
         "https://internal.example.com/hb"
     );
+}
+
+#[test]
+fn config_rejects_unsupported_signing_algorithm() {
+    let err = OperonConfig::builder()
+        .client_id("client")
+        .client_secret("secret")
+        .signing_algorithm("invalid")
+        .build()
+        .unwrap_err();
+
+    assert!(matches!(
+        err,
+        operon_sdk::config::ConfigError::UnsupportedSigningAlgorithm(_)
+    ));
 }

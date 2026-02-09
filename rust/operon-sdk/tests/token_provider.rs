@@ -1,14 +1,13 @@
 use std::time::Duration;
 
-use operon_sdk::auth::ClientCredentialsTokenProvider;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine as _;
+use operon_sdk::auth::{decode_token_claims, ClientCredentialsTokenProvider};
 use operon_sdk::config::OperonConfig;
 use reqwest::Client;
 use tokio::time::sleep;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
-
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine as _;
 
 fn build_token(claims: serde_json::Value) -> String {
     let header = URL_SAFE_NO_PAD.encode(r#"{"alg":"HS256","typ":"JWT"}"#.as_bytes());
@@ -24,7 +23,10 @@ async fn token_provider_caches_until_expiry() {
     Mock::given(method("POST"))
         .and(path("/oauth/token"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "access_token": build_token(serde_json::json!({"participant_did":"did:test:123","channel_id":"chnl"})),
+            "access_token": build_token(serde_json::json!({
+                "participant_did":"did:test:123",
+                "workstream_id":"wrk-1"
+            })),
             "expires_in": 120,
             "token_type": "Bearer"
         })))
@@ -50,6 +52,7 @@ async fn token_provider_caches_until_expiry() {
 
     assert_eq!(first.value, second.value);
     assert_eq!(first.participant_did.as_deref(), Some("did:test:123"));
+    assert_eq!(first.workstream_id.as_deref(), Some("wrk-1"));
 }
 
 #[tokio::test]
@@ -123,4 +126,23 @@ async fn token_provider_force_refresh_bypasses_cache() {
         .filter(|req| req.url.path() == "/oauth/token")
         .count();
     assert!(hits >= 2);
+}
+
+#[test]
+fn decode_token_claims_falls_back_to_channel_id() {
+    let token = build_token(serde_json::json!({
+        "channel_id": "wrk-legacy",
+        "participant_did": "did:test:legacy",
+        "participant_id": "part-1",
+        "client_id": "cli-1",
+        "azp": "azp-1",
+        "exp": 1924992000
+    }));
+
+    let claims = decode_token_claims(&token);
+    assert_eq!(
+        claims.normalized_workstream_id().as_deref(),
+        Some("wrk-legacy")
+    );
+    assert_eq!(claims.participant_did.as_deref(), Some("did:test:legacy"));
 }

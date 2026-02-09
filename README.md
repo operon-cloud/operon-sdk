@@ -14,7 +14,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 > ✅ Java (1.3.0)  
 > ✅ Node.js (1.3.0)  
 > ✅ .NET (1.3.0)  
-> ✅ Rust (1.0.1)  
+> ✅ Rust (1.3.0)  
 > ✅ Python (1.3.0)
 
 ---
@@ -287,7 +287,7 @@ The Rust crate targets **Rust 1.75+** and ships with async APIs built on `reqwes
 
 ```toml
 [dependencies]
-operon-sdk = { path = "rust/operon-sdk" }
+operon-sdk = "1.3.0"
 ```
 
 ### Quick Start
@@ -307,7 +307,7 @@ async fn main() -> Result<(), operon_sdk::errors::OperonError> {
     client.init().await?;
 
     let request = TransactionRequest::new("corr-123", "int-abc")?
-        .with_payload_bytes(br"{"foo":"bar"}");
+        .with_payload_bytes(br#"{"foo":"bar"}"#);
 
     let transaction = client.submit_transaction(request).await?;
     println!("transaction {} status={}", transaction.id, transaction.status);
@@ -323,7 +323,7 @@ cargo fmt
 cargo test
 ```
 
-The crate includes integration tests powered by `wiremock` covering token refresh, self-signing, and manual signature flows.
+The crate includes integration tests powered by `wiremock` covering token refresh, workstream datasets, signing header validation, PAT helpers, and session validation.
 
 ---
 

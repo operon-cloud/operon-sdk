@@ -115,3 +115,28 @@ All notable SDK changes are documented in this file.
   - `PatHelpers.FetchWorkstream*` helpers and base64 payload decoder
   - `SessionValidator.ValidateSessionAsync`
 - Updated .NET package version to `1.3.0` and refreshed docs/tests for the new API surface.
+
+### Rust SDK
+
+- Upgraded Rust SDK to functional parity with Go `v1.3.0`.
+- Migrated transaction/catalog flows to workstream-era APIs while preserving channel compatibility aliases:
+  - reference data now loads from `/v1/interactions` and `/v1/participants`
+  - workstream APIs now support `/v1/workstreams/{workstreamId}/...`
+  - `channelId` remains supported as a compatibility alias for `workstreamId`
+- Expanded transaction request/response models with parity fields:
+  - actor/assignee attribution (`actorExternal*`, `assigneeExternal*`)
+  - state fields (`state`, `stateId`, `stateLabel`)
+  - ROI compatibility fields (`roiBaseCost`, `roiBaseTime`, `roiCostSaving`, `roiTimeSaving`)
+  - context fields (`customerId`, `workspaceId`, `createdBy`)
+- Added client-side validation parity:
+  - actor source required when actor id/display is provided
+  - assignee source required when assignee id/display is provided
+  - legacy ROI values cannot be negative
+- Added client workstream/signature parity methods:
+  - `get_workstream`, `get_workstream_interactions`, `get_workstream_participants`
+  - `generate_signature_headers*`, `validate_signature_headers*`
+- Added PAT/session parity helpers:
+  - `sign_hash_with_pat`, `submit_transaction_with_pat`, `validate_signature_with_pat*`
+  - `fetch_workstream*` helpers and base64 payload decoder
+  - `validate_session`
+- Updated Rust crate version to `1.3.0` and refreshed Rust docs/tests for the expanded API surface.

@@ -1,17 +1,19 @@
 # Operon Rust SDK
 
-Idiomatic Rust client for the [Operon.Cloud](https://www.operon.cloud) platform targeting **Rust 1.75+**. The crate mirrors features available in the Go, Java, Node, and .NET SDKs while embracing async/await, `reqwest`, and serde for ergonomic usage.
+Idiomatic Rust client for the [Operon.Cloud](https://www.operon.cloud) platform targeting **Rust 1.75+**.
 
-## Usage
+## Installation
 
 ```toml
 [dependencies]
-operon-sdk = "1.0.2"
+operon-sdk = "1.3.0"
 ```
+
+## Quick Start
 
 ```rust
 use operon_sdk::{OperonClient, OperonConfig};
-use operon_sdk::models::TransactionRequest;
+use operon_sdk::models::{Signature, TransactionRequest};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -23,22 +25,49 @@ async fn main() -> anyhow::Result<()> {
     let client = OperonClient::new(config)?;
     client.init().await?;
 
-    let txn = client
-        .submit_transaction(TransactionRequest::new("corr-123", "int-abc")?
-            .with_payload_bytes(br"{\"foo\":\"bar\"}"))
-        .await?;
+    let mut request = TransactionRequest::new("corr-123", "int-abc")?
+        .with_payload_bytes(br#"{"foo":"bar"}"#)
+        .with_state("triage")
+        .with_state_id("state-1")
+        .with_state_label("Triage")
+        .with_actor_external("zendesk", "agent-1", "Ops Agent")
+        .with_assignee_external("jira", "owner-1", "Case Owner")
+        .with_customer_id("cust-1")
+        .with_workspace_id("ws-1")
+        .with_created_by("ingestion-service");
 
-println!("transaction {} status={}", txn.id, txn.status);
+    request.roi_base_cost = Some(100);
+    request.roi_base_time = Some(20);
+    request.roi_cost_saving = Some(15);
+    request.roi_time_saving = Some(3);
+
+    let transaction = client.submit_transaction(request).await?;
+    println!("transaction {} status={}", transaction.id, transaction.status);
+
     Ok(())
 }
 ```
 
-> **Security note**
-> The Rust SDK mirrors the Go implementation: it computes a SHA-256 hash locally and only sends the hash (`payloadHash`) to Operon. Raw payload bytes never leave your service.
+## Functional Parity (Go v1.3.0)
 
-### Optional session keep-alive
+- Workstream-first transaction/catalog APIs with channel compatibility aliases.
+- Expanded transaction request/response model:
+  - actor/assignee attribution (`actorExternal*`, `assigneeExternal*`)
+  - state fields (`state`, `stateId`, `stateLabel`)
+  - ROI compatibility fields (`roiBaseCost`, `roiBaseTime`, `roiCostSaving`, `roiTimeSaving`)
+  - context fields (`customerId`, `workspaceId`, `createdBy`)
+- Client methods:
+  - `interactions`, `participants`
+  - `get_workstream`, `get_workstream_interactions`, `get_workstream_participants`
+  - `generate_signature_headers`, `validate_signature_headers`
+- PAT helpers:
+  - `sign_hash_with_pat`, `submit_transaction_with_pat`, `validate_signature_with_pat`
+  - `fetch_workstream`, `fetch_workstream_interactions`, `fetch_workstream_participants`
+  - `decode_payload_base64`
+- Session helper:
+  - `validate_session`
 
-Long-lived daemons can configure a heartbeat so the SDK pings `/v1/session/heartbeat` and forces a token refresh when Operon responds with 401:
+## Optional Session Keep-Alive
 
 ```rust
 let config = OperonConfig::builder()
@@ -57,22 +86,6 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-## Features
-
-- Client-credentials token provider with proactive refresh
-- Interaction/participant catalogue cache
-- Optional self-sign flow for payload hashes
-- Comprehensive error types (`OperonError`, `ApiError`, `TransportError`)
-- Unit tests powered by `wiremock`
-
-## Minimum Supported Rust Version (MSRV)
-
-Rust 1.75.0 (locked via package metadata). The crate is tested against the latest stable release.
-
 ---
 
 Licensed under Apache-2.0.
-
-—
-
-Find other language SDKs and onboarding guides at https://www.operon.cloud/developers

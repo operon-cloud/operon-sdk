@@ -1,9 +1,8 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine as _;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use reqwest::{Client, Method, StatusCode};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -11,14 +10,68 @@ use tokio::sync::Mutex;
 use crate::config::OperonConfig;
 use crate::errors::OperonError;
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TokenClaims {
+    #[serde(rename = "participant_did", default)]
+    pub participant_did: Option<String>,
+    #[serde(rename = "workstream_id", default)]
+    pub workstream_id: Option<String>,
+    #[serde(rename = "channel_id", default)]
+    pub channel_id: Option<String>,
+    #[serde(rename = "customer_id", default)]
+    pub customer_id: Option<String>,
+    #[serde(rename = "workspace_id", default)]
+    pub workspace_id: Option<String>,
+    #[serde(default)]
+    pub email: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(rename = "tenant_ids", default)]
+    pub tenant_ids: Vec<String>,
+    #[serde(default)]
+    pub roles: Vec<String>,
+    #[serde(rename = "member_id", default)]
+    pub member_id: Option<String>,
+    #[serde(rename = "session_id", default)]
+    pub session_id: Option<String>,
+    #[serde(rename = "org_id", default)]
+    pub org_id: Option<String>,
+    #[serde(rename = "participant_id", default)]
+    pub participant_id: Option<String>,
+    #[serde(rename = "client_id", default)]
+    pub client_id: Option<String>,
+    #[serde(rename = "azp", default)]
+    pub authorized_party: Option<String>,
+    #[serde(rename = "exp", default)]
+    pub exp: Option<i64>,
+}
+
+impl TokenClaims {
+    pub fn normalized_workstream_id(&self) -> Option<String> {
+        first_non_empty(self.workstream_id.clone(), self.channel_id.clone())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AccessToken {
     pub value: String,
     pub expires_at: DateTime<Utc>,
     pub participant_did: Option<String>,
+    pub workstream_id: Option<String>,
     pub channel_id: Option<String>,
     pub customer_id: Option<String>,
     pub workspace_id: Option<String>,
+    pub email: Option<String>,
+    pub name: Option<String>,
+    pub tenant_ids: Vec<String>,
+    pub roles: Vec<String>,
+    pub member_id: Option<String>,
+    pub session_id: Option<String>,
+    pub org_id: Option<String>,
+    pub participant_id: Option<String>,
+    pub client_id: Option<String>,
+    pub authorized_party: Option<String>,
+    pub exp: Option<i64>,
 }
 
 #[derive(Clone)]
@@ -82,24 +135,39 @@ impl ClientCredentialsTokenProvider {
 
         let payload: TokenResponse = response.json().await.map_err(OperonError::Transport)?;
 
-        let token = payload
+        let value = payload
             .access_token
             .ok_or_else(|| OperonError::validation("token response missing access_token"))?;
+
         let expires_in = if payload.expires_in <= 0 {
             60
         } else {
             payload.expires_in
         };
-        let expires_at = Utc::now() + chrono::Duration::seconds(expires_in.into());
-        let claims = decode_claims(&token).unwrap_or_default();
+        let expires_at = Utc::now() + chrono::Duration::seconds(expires_in);
+
+        let claims = decode_token_claims(&value);
+        let workstream_id = claims.normalized_workstream_id();
 
         Ok(AccessToken {
-            value: token,
+            value,
             expires_at,
-            participant_did: claims.get("participant_did").cloned(),
-            channel_id: claims.get("channel_id").cloned(),
-            customer_id: claims.get("customer_id").cloned(),
-            workspace_id: claims.get("workspace_id").cloned(),
+            participant_did: trim_opt(claims.participant_did),
+            workstream_id: workstream_id.clone(),
+            channel_id: workstream_id,
+            customer_id: trim_opt(claims.customer_id),
+            workspace_id: trim_opt(claims.workspace_id),
+            email: trim_opt(claims.email),
+            name: trim_opt(claims.name),
+            tenant_ids: normalize_values(claims.tenant_ids),
+            roles: normalize_values(claims.roles),
+            member_id: trim_opt(claims.member_id),
+            session_id: trim_opt(claims.session_id),
+            org_id: trim_opt(claims.org_id),
+            participant_id: trim_opt(claims.participant_id),
+            client_id: trim_opt(claims.client_id),
+            authorized_party: trim_opt(claims.authorized_party),
+            exp: claims.exp,
         })
     }
 
@@ -110,11 +178,8 @@ impl ClientCredentialsTokenProvider {
         let is_legacy = self.config.token_url.path().contains("/v1/session/m2m");
 
         if is_legacy {
-            let audience = if self.config.audience.is_empty() {
-                None
-            } else {
-                Some(self.config.audience.clone())
-            };
+            let audience =
+                (!self.config.audience.is_empty()).then_some(self.config.audience.clone());
             builder = builder.json(&LegacyBody {
                 client_id: self.config.client_id.clone(),
                 client_secret: self.config.client_secret.clone(),
@@ -123,22 +188,18 @@ impl ClientCredentialsTokenProvider {
                 audience,
             });
         } else {
-            let mut form: Vec<(String, String)> =
-                vec![("grant_type".into(), "client_credentials".into())];
+            let mut form = vec![("grant_type".to_string(), "client_credentials".to_string())];
             if let Some(scope) = &self.config.scope {
-                form.push(("scope".into(), scope.clone()));
+                form.push(("scope".to_string(), scope.clone()));
             }
-            for aud in &self.config.audience {
-                form.push(("audience".into(), aud.clone()));
+            for audience in &self.config.audience {
+                form.push(("audience".to_string(), audience.clone()));
             }
-            builder = builder.form(&form);
+
             let credentials = format!("{}:{}", self.config.client_id, self.config.client_secret);
-            builder = builder.header(
+            builder = builder.form(&form).header(
                 reqwest::header::AUTHORIZATION,
-                format!(
-                    "Basic {}",
-                    base64::engine::general_purpose::STANDARD.encode(credentials)
-                ),
+                format!("Basic {}", STANDARD.encode(credentials)),
             );
         }
 
@@ -167,22 +228,60 @@ struct LegacyBody {
     audience: Option<Vec<String>>,
 }
 
-fn decode_claims(token: &str) -> Option<HashMap<String, String>> {
+pub fn decode_token_claims(token: &str) -> TokenClaims {
     let segments: Vec<&str> = token.split('.').collect();
     if segments.len() < 2 {
-        return None;
+        return TokenClaims::default();
     }
-    let decoded = URL_SAFE_NO_PAD.decode(segments[1]).ok()?;
-    let json: serde_json::Value = serde_json::from_slice(&decoded).ok()?;
-    let mut map = HashMap::new();
-    if let Some(obj) = json.as_object() {
-        for (key, value) in obj.iter() {
-            if let Some(s) = value.as_str() {
-                map.insert(key.clone(), s.to_string());
-            }
+
+    let payload = decode_segment(segments[1]);
+    let Ok(payload) = payload else {
+        return TokenClaims::default();
+    };
+
+    let parsed = serde_json::from_slice::<TokenClaims>(&payload);
+    let mut claims = parsed.unwrap_or_default();
+    if claims.normalized_workstream_id().is_none() {
+        claims.workstream_id = None;
+        claims.channel_id = None;
+    } else if claims.workstream_id.is_none() {
+        claims.workstream_id = claims.channel_id.clone();
+    }
+    claims
+}
+
+pub fn claims_expiry(claims: &TokenClaims) -> Option<DateTime<Utc>> {
+    claims
+        .exp
+        .and_then(|value| Utc.timestamp_opt(value, 0).single())
+}
+
+fn decode_segment(segment: &str) -> Result<Vec<u8>, base64::DecodeError> {
+    URL_SAFE_NO_PAD
+        .decode(segment)
+        .or_else(|_| STANDARD.decode(segment))
+}
+
+fn normalize_values(values: Vec<String>) -> Vec<String> {
+    values
+        .into_iter()
+        .filter_map(|entry| trim_opt(Some(entry)))
+        .collect()
+}
+
+fn first_non_empty(primary: Option<String>, fallback: Option<String>) -> Option<String> {
+    trim_opt(primary).or_else(|| trim_opt(fallback))
+}
+
+fn trim_opt(value: Option<String>) -> Option<String> {
+    value.and_then(|entry| {
+        let trimmed = entry.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
         }
-    }
-    Some(map)
+    })
 }
 
 fn decode_error(status: StatusCode, body: Option<String>) -> OperonError {
@@ -190,28 +289,29 @@ fn decode_error(status: StatusCode, body: Option<String>) -> OperonError {
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
             let message = json
                 .get("message")
-                .and_then(|v| v.as_str())
-                .unwrap_or(status.as_str());
+                .and_then(|value| value.as_str())
+                .unwrap_or(status.as_str())
+                .to_string();
             let code = json
                 .get("code")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+                .and_then(|value| value.as_str())
+                .map(|value| value.to_string());
             return OperonError::Api {
                 status,
                 code,
-                message: message.to_string(),
+                message,
             };
         }
-        OperonError::Api {
+        return OperonError::Api {
             status,
             code: None,
             message: body,
-        }
-    } else {
-        OperonError::Api {
-            status,
-            code: None,
-            message: status.as_str().to_string(),
-        }
+        };
+    }
+
+    OperonError::Api {
+        status,
+        code: None,
+        message: status.as_str().to_string(),
     }
 }
