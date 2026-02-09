@@ -15,7 +15,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 > ✅ Node.js (1.0.1)  
 > ✅ .NET (1.0.1)  
 > ✅ Rust (1.0.1)  
-> ✅ Python (1.0.1)
+> ✅ Python (1.3.0)
 
 ---
 

@@ -1,8 +1,6 @@
 # Operon Python SDK
 
-Language‑specific docs for the [Operon.Cloud](https://www.operon.cloud) Python client.
-
-The package source and quick start live under `operon_sdk/`:
+Language-specific docs for the [Operon.Cloud](https://www.operon.cloud) Python client.
 
 ```bash
 cd python/operon_sdk
@@ -12,10 +10,10 @@ pip install -e .[dev]
 pytest
 ```
 
-See the full README with code examples here:
+Primary package docs and examples:
 
-- python/operon_sdk/README.md
+- `python/operon_sdk/README.md`
 
-—
+Parity target:
 
-Need broader context and links for other languages? Visit Operon.Cloud Developers: https://www.operon.cloud/developers
+- Python SDK `1.3.0` is aligned with Go SDK `1.3.0` for transactions, signing, PAT helpers, workstream APIs, and session validation.

@@ -1,6 +1,7 @@
 # Operon Python SDK
 
-Asynchronous Python client for [Operon.Cloud](https://www.operon.cloud) services. Targets Python **3.10+** and mirrors the feature set provided in the Go, Java, Node, .NET, and Rust SDKs.
+Asynchronous Python client for [Operon.Cloud](https://www.operon.cloud) services.
+Targets Python **3.10+** and now aligns functionally with the Go SDK `v1.3.0`.
 
 ## Installation
 
@@ -8,7 +9,11 @@ Asynchronous Python client for [Operon.Cloud](https://www.operon.cloud) services
 pip install operon-sdk
 ```
 
-(For now the package lives in this repository; install with `pip install -e python/operon_sdk` during development.)
+For local development:
+
+```bash
+pip install -e python/operon_sdk
+```
 
 ## Quick Start
 
@@ -17,45 +22,69 @@ import asyncio
 from operon_sdk import OperonClient, OperonConfig
 from operon_sdk.models import TransactionRequest
 
+
 async def main() -> None:
-    config = OperonConfig(
-        client_id="your-client-id",
-        client_secret="your-client-secret",
+    client = OperonClient(
+        OperonConfig(
+            client_id="your-client-id",
+            client_secret="your-client-secret",
+        )
     )
 
-    client = OperonClient(config)
     await client.init()
 
-    request = TransactionRequest.new(
-        correlation_id="corr-123",
-        interaction_id="int-abc",
-    ).with_payload_bytes(b'{"foo":"bar"}')
+    request = (
+        TransactionRequest.new("corr-123", "int-abc")
+        .with_payload_bytes(b'{"foo":"bar"}')
+    )
+    request.actor_external_id = "agent-7"
+    request.actor_external_display_name = "Agent Seven"
+    request.actor_external_source = "crm"
+    request.assignee_external_id = "owner-8"
+    request.assignee_external_display_name = "Owner Eight"
+    request.assignee_external_source = "crm"
 
-    transaction = await client.submit_transaction(request)
-    print("Transaction", transaction.id)
+    txn = await client.submit_transaction(request)
+    print(txn.id, txn.status)
+
+    await client.aclose()
+
 
 asyncio.run(main())
 ```
 
-> **Security note**
-> The Python SDK mirrors the Go implementation: it computes a SHA-256 hash of any payload bytes you provide and only transmits the hash (`payloadHash`) to Operon. Raw payloads never leave your application boundary.
+Security note: the SDK computes SHA-256 for payload bytes and sends only `payloadHash`.
 
-### Session keep-alive (optional)
+## Included Surfaces
 
-Long-running workers can enable the background heartbeat so the SDK pings `/v1/session/heartbeat` and forces a token refresh if Operon responds with `401`. Set `session_heartbeat_interval` (seconds) when building the config:
+- Transaction submit with self-sign or manual-sign paths
+- Interaction/participant reference cache via `/v1/interactions` and `/v1/participants`
+- Workstream APIs:
+  - `get_workstream`
+  - `get_workstream_interactions`
+  - `get_workstream_participants`
+- Signature helpers:
+  - `generate_signature_headers`
+  - `validate_signature_headers`
+- PAT helpers:
+  - `sign_hash_with_pat`
+  - `submit_transaction_with_pat`
+  - `validate_signature_with_pat`
+  - `fetch_workstream`, `fetch_workstream_interactions`, `fetch_workstream_participants`
+- Session validation helper:
+  - `validate_session`
+
+## Optional Session Heartbeat
 
 ```python
 config = OperonConfig(
     client_id="your-client-id",
     client_secret="your-client-secret",
-    session_heartbeat_interval=120.0,  # ping every 2 minutes
+    session_heartbeat_interval=120.0,
 )
-
-client = OperonClient(config)
-await client.init()  # starts the heartbeat loop
-...
-await client.aclose()  # stops the loop
 ```
+
+When enabled, the client pings `/v1/session/heartbeat` and forces a token refresh on `401`.
 
 ## Development
 
@@ -68,23 +97,6 @@ pytest
 black .
 ```
 
-## Features
-
-- Async client built on `httpx`
-- Client-credentials token provider with proactive refresh
-- Interaction/participant catalogue caching
-- Optional self-sign workflow for payload hashes
-- Strongly typed request/response models via Pydantic v2
-- Comprehensive unit tests powered by `pytest` + `respx`
-
-## Minimum Supported Python Version
-
-Python 3.10+.
-
 ---
 
 Licensed under Apache-2.0.
-
-—
-
-Discover more SDKs and guides at the Operon.Cloud Developers hub: https://www.operon.cloud/developers
