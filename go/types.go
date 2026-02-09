@@ -53,63 +53,83 @@ type Signature struct {
 
 // Transaction mirrors the persisted domain entity returned by TrustOperon services.
 type Transaction struct {
-	ID                    string            `json:"id"`
-	CorrelationID         string            `json:"correlationId"`
-	WorkstreamID          string            `json:"workstreamId"`
-	WorkstreamName        string            `json:"workstreamName,omitempty"`
-	CustomerID            string            `json:"customerId,omitempty"`
-	WorkspaceID           string            `json:"workspaceId,omitempty"`
-	InteractionID         string            `json:"interactionId"`
-	Timestamp             time.Time         `json:"timestamp"`
-	SourceDID             string            `json:"sourceDid"`
-	TargetDID             string            `json:"targetDid"`
-	State                 string            `json:"state,omitempty"`
-	StateID               string            `json:"stateId,omitempty"`
-	StateLabel            string            `json:"stateLabel,omitempty"`
-	ROIClassification     ROIClassification `json:"roiClassification,omitempty"`
-	ROICostIncrement      int               `json:"roiCostIncrement,omitempty"`
-	ROITimeIncrement      int               `json:"roiTimeIncrement,omitempty"`
-	ROICostSavings        int               `json:"roiCostSavings,omitempty"`
-	ROITimeSavings        int               `json:"roiTimeSavings,omitempty"`
-	Signature             Signature         `json:"signature"`
-	Label                 string            `json:"label,omitempty"`
-	Tags                  []string          `json:"tags,omitempty"`
-	PayloadHash           string            `json:"payloadHash"`
-	Status                string            `json:"status"`
-	HCSTopicID            string            `json:"hcsTopicId,omitempty"`
-	HCSSequenceNumber     int64             `json:"hcsSequenceNumber,omitempty"`
-	HCSConsensusTimestamp string            `json:"hcsConsensusTimestamp,omitempty"`
-	HCSTransactionID      string            `json:"hcsTransactionId,omitempty"`
-	HCSRunningHash        string            `json:"hcsRunningHash,omitempty"`
-	CreatedAt             time.Time         `json:"createdAt"`
-	UpdatedAt             time.Time         `json:"updatedAt"`
-	CreatedBy             string            `json:"createdBy,omitempty"`
-	UpdatedBy             string            `json:"updatedBy,omitempty"`
-	Version               int               `json:"version,omitempty"`
+	ID                          string            `json:"id"`
+	CorrelationID               string            `json:"correlationId"`
+	WorkstreamID                string            `json:"workstreamId"`
+	WorkstreamName              string            `json:"workstreamName,omitempty"`
+	CustomerID                  string            `json:"customerId,omitempty"`
+	WorkspaceID                 string            `json:"workspaceId,omitempty"`
+	InteractionID               string            `json:"interactionId"`
+	Timestamp                   time.Time         `json:"timestamp"`
+	SourceDID                   string            `json:"sourceDid"`
+	TargetDID                   string            `json:"targetDid"`
+	State                       string            `json:"state,omitempty"`
+	StateID                     string            `json:"stateId,omitempty"`
+	StateLabel                  string            `json:"stateLabel,omitempty"`
+	ROIClassification           ROIClassification `json:"roiClassification,omitempty"`
+	ROICostIncrement            int               `json:"roiCostIncrement,omitempty"`
+	ROITimeIncrement            int               `json:"roiTimeIncrement,omitempty"`
+	ROICostSavings              int               `json:"roiCostSavings,omitempty"`
+	ROITimeSavings              int               `json:"roiTimeSavings,omitempty"`
+	ROIBaseCost                 int               `json:"roiBaseCost,omitempty"`
+	ROIBaseTime                 int               `json:"roiBaseTime,omitempty"`
+	ROICostSaving               int               `json:"roiCostSaving,omitempty"`
+	ROITimeSaving               int               `json:"roiTimeSaving,omitempty"`
+	Signature                   Signature         `json:"signature"`
+	Label                       string            `json:"label,omitempty"`
+	Tags                        []string          `json:"tags,omitempty"`
+	PayloadHash                 string            `json:"payloadHash"`
+	ActorExternalID             string            `json:"actorExternalId,omitempty"`
+	ActorExternalDisplayName    string            `json:"actorExternalDisplayName,omitempty"`
+	ActorExternalSource         string            `json:"actorExternalSource,omitempty"`
+	AssigneeExternalID          string            `json:"assigneeExternalId,omitempty"`
+	AssigneeExternalDisplayName string            `json:"assigneeExternalDisplayName,omitempty"`
+	AssigneeExternalSource      string            `json:"assigneeExternalSource,omitempty"`
+	Status                      string            `json:"status"`
+	HCSTopicID                  string            `json:"hcsTopicId,omitempty"`
+	HCSSequenceNumber           int64             `json:"hcsSequenceNumber,omitempty"`
+	HCSConsensusTimestamp       string            `json:"hcsConsensusTimestamp,omitempty"`
+	HCSTransactionID            string            `json:"hcsTransactionId,omitempty"`
+	HCSRunningHash              string            `json:"hcsRunningHash,omitempty"`
+	CreatedAt                   time.Time         `json:"createdAt"`
+	UpdatedAt                   time.Time         `json:"updatedAt"`
+	CreatedBy                   string            `json:"createdBy,omitempty"`
+	UpdatedBy                   string            `json:"updatedBy,omitempty"`
+	Version                     int               `json:"version,omitempty"`
 }
 
 // TransactionRequest captures the payload submitted by SDK callers.
 type TransactionRequest struct {
-	CorrelationID     string            `json:"correlationId"`
-	WorkstreamID      string            `json:"workstreamId,omitempty"`
-	InteractionID     string            `json:"interactionId"`
-	Timestamp         time.Time         `json:"timestamp,omitempty"`
-	SourceDID         string            `json:"sourceDid,omitempty"`
-	TargetDID         string            `json:"targetDid,omitempty"`
-	ROIClassification ROIClassification `json:"roiClassification,omitempty"`
-	ROICost           int               `json:"roiCost,omitempty"`
-	ROITime           int               `json:"roiTime,omitempty"`
-	State             string            `json:"state,omitempty"`
-	StateID           string            `json:"stateId,omitempty"`
-	StateLabel        string            `json:"stateLabel,omitempty"`
-	Signature         Signature         `json:"signature"`
-	Label             string            `json:"label,omitempty"`
-	Tags              []string          `json:"tags,omitempty"`
-	Payload           []byte            `json:"-"`
-	PayloadHash       string            `json:"payloadHash,omitempty"`
-	CustomerID        string            `json:"customerId,omitempty"`
-	WorkspaceID       string            `json:"workspaceId,omitempty"`
-	CreatedBy         string            `json:"createdBy,omitempty"`
+	CorrelationID               string            `json:"correlationId"`
+	WorkstreamID                string            `json:"workstreamId,omitempty"`
+	InteractionID               string            `json:"interactionId"`
+	Timestamp                   time.Time         `json:"timestamp,omitempty"`
+	SourceDID                   string            `json:"sourceDid,omitempty"`
+	TargetDID                   string            `json:"targetDid,omitempty"`
+	ROIClassification           ROIClassification `json:"roiClassification,omitempty"`
+	ROICost                     int               `json:"roiCost,omitempty"`
+	ROITime                     int               `json:"roiTime,omitempty"`
+	State                       string            `json:"state,omitempty"`
+	StateID                     string            `json:"stateId,omitempty"`
+	StateLabel                  string            `json:"stateLabel,omitempty"`
+	ROIBaseCost                 int               `json:"roiBaseCost,omitempty"`
+	ROIBaseTime                 int               `json:"roiBaseTime,omitempty"`
+	ROICostSaving               int               `json:"roiCostSaving,omitempty"`
+	ROITimeSaving               int               `json:"roiTimeSaving,omitempty"`
+	Signature                   Signature         `json:"signature"`
+	Label                       string            `json:"label,omitempty"`
+	Tags                        []string          `json:"tags,omitempty"`
+	Payload                     []byte            `json:"-"`
+	PayloadHash                 string            `json:"payloadHash,omitempty"`
+	ActorExternalID             string            `json:"actorExternalId,omitempty"`
+	ActorExternalDisplayName    string            `json:"actorExternalDisplayName,omitempty"`
+	ActorExternalSource         string            `json:"actorExternalSource,omitempty"`
+	AssigneeExternalID          string            `json:"assigneeExternalId,omitempty"`
+	AssigneeExternalDisplayName string            `json:"assigneeExternalDisplayName,omitempty"`
+	AssigneeExternalSource      string            `json:"assigneeExternalSource,omitempty"`
+	CustomerID                  string            `json:"customerId,omitempty"`
+	WorkspaceID                 string            `json:"workspaceId,omitempty"`
+	CreatedBy                   string            `json:"createdBy,omitempty"`
 }
 
 type InteractionSummary struct {
@@ -203,22 +223,35 @@ const (
 
 // transactionSubmission mirrors the JSON payload expected by the client API for transaction creation.
 type transactionSubmission struct {
-	CorrelationID     string            `json:"correlationId"`
-	WorkstreamID      string            `json:"workstreamId"`
-	InteractionID     string            `json:"interactionId"`
-	Timestamp         string            `json:"timestamp"`
-	SourceDID         string            `json:"sourceDid"`
-	TargetDID         string            `json:"targetDid"`
-	ROIClassification ROIClassification `json:"roiClassification,omitempty"`
-	ROICost           int               `json:"roiCost,omitempty"`
-	ROITime           int               `json:"roiTime,omitempty"`
-	State             string            `json:"state,omitempty"`
-	StateID           string            `json:"stateId,omitempty"`
-	StateLabel        string            `json:"stateLabel,omitempty"`
-	Signature         Signature         `json:"signature"`
-	PayloadHash       string            `json:"payloadHash"`
-	Label             string            `json:"label,omitempty"`
-	Tags              []string          `json:"tags,omitempty"`
+	CorrelationID               string            `json:"correlationId"`
+	WorkstreamID                string            `json:"workstreamId"`
+	InteractionID               string            `json:"interactionId"`
+	Timestamp                   string            `json:"timestamp"`
+	SourceDID                   string            `json:"sourceDid"`
+	TargetDID                   string            `json:"targetDid"`
+	ROIClassification           ROIClassification `json:"roiClassification,omitempty"`
+	ROICost                     int               `json:"roiCost,omitempty"`
+	ROITime                     int               `json:"roiTime,omitempty"`
+	State                       string            `json:"state,omitempty"`
+	StateID                     string            `json:"stateId,omitempty"`
+	StateLabel                  string            `json:"stateLabel,omitempty"`
+	ROIBaseCost                 int               `json:"roiBaseCost,omitempty"`
+	ROIBaseTime                 int               `json:"roiBaseTime,omitempty"`
+	ROICostSaving               int               `json:"roiCostSaving,omitempty"`
+	ROITimeSaving               int               `json:"roiTimeSaving,omitempty"`
+	Signature                   Signature         `json:"signature"`
+	PayloadHash                 string            `json:"payloadHash"`
+	Label                       string            `json:"label,omitempty"`
+	Tags                        []string          `json:"tags,omitempty"`
+	ActorExternalID             string            `json:"actorExternalId,omitempty"`
+	ActorExternalDisplayName    string            `json:"actorExternalDisplayName,omitempty"`
+	ActorExternalSource         string            `json:"actorExternalSource,omitempty"`
+	AssigneeExternalID          string            `json:"assigneeExternalId,omitempty"`
+	AssigneeExternalDisplayName string            `json:"assigneeExternalDisplayName,omitempty"`
+	AssigneeExternalSource      string            `json:"assigneeExternalSource,omitempty"`
+	CustomerID                  string            `json:"customerId,omitempty"`
+	WorkspaceID                 string            `json:"workspaceId,omitempty"`
+	CreatedBy                   string            `json:"createdBy,omitempty"`
 }
 
 // ValidateForSubmit verifies the client-side invariants for a TransactionRequest prior to submission.
@@ -257,6 +290,26 @@ func (r TransactionRequest) ValidateForSubmit() error {
 		if !isROIClassification(r.ROIClassification) {
 			return fmt.Errorf("ROIClassification must be one of baseline, increment, savings")
 		}
+	}
+	if r.ROIBaseCost < 0 {
+		return errors.New("ROIBaseCost cannot be negative")
+	}
+	if r.ROIBaseTime < 0 {
+		return errors.New("ROIBaseTime cannot be negative")
+	}
+	if r.ROICostSaving < 0 {
+		return errors.New("ROICostSaving cannot be negative")
+	}
+	if r.ROITimeSaving < 0 {
+		return errors.New("ROITimeSaving cannot be negative")
+	}
+	if strings.TrimSpace(r.ActorExternalSource) == "" &&
+		(strings.TrimSpace(r.ActorExternalID) != "" || strings.TrimSpace(r.ActorExternalDisplayName) != "") {
+		return errors.New("ActorExternalSource is required when ActorExternalID or ActorExternalDisplayName is set")
+	}
+	if strings.TrimSpace(r.AssigneeExternalSource) == "" &&
+		(strings.TrimSpace(r.AssigneeExternalID) != "" || strings.TrimSpace(r.AssigneeExternalDisplayName) != "") {
+		return errors.New("AssigneeExternalSource is required when AssigneeExternalID or AssigneeExternalDisplayName is set")
 	}
 	return nil
 }

@@ -60,7 +60,7 @@ On success the method returns details about the signing DID, algorithm, and key.
 
 ## Convenience helpers
 
-For textual bodies use `ValidateSignatureHeadersFromString(ctx, stringBody, headers)`. Under the hood the SDK calls the primary validation endpoint and transparently falls back to the legacy compatibility path when needed.
+For textual bodies use `ValidateSignatureHeadersFromString(ctx, stringBody, headers)`, which delegates to `ValidateSignatureHeaders` using UTF-8 bytes from the provided string.
 
 ## Troubleshooting
 

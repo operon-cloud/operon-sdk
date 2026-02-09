@@ -91,6 +91,19 @@ func TestSubmitTransactionWithPATSuccess(t *testing.T) {
 		require.Equal(t, "interaction-xyz", body["interactionId"])
 		require.Equal(t, "did:example:source", body["sourceDid"])
 		require.Equal(t, "did:example:target", body["targetDid"])
+		require.Equal(t, float64(11), body["roiBaseCost"])
+		require.Equal(t, float64(9), body["roiBaseTime"])
+		require.Equal(t, float64(5), body["roiCostSaving"])
+		require.Equal(t, float64(3), body["roiTimeSaving"])
+		require.Equal(t, "agent-7", body["actorExternalId"])
+		require.Equal(t, "Agent Seven", body["actorExternalDisplayName"])
+		require.Equal(t, "crm", body["actorExternalSource"])
+		require.Equal(t, "owner-8", body["assigneeExternalId"])
+		require.Equal(t, "Owner Eight", body["assigneeExternalDisplayName"])
+		require.Equal(t, "crm", body["assigneeExternalSource"])
+		require.Equal(t, "cust-2", body["customerId"])
+		require.Equal(t, "wksp-2", body["workspaceId"])
+		require.Equal(t, "user-2", body["createdBy"])
 		require.Equal(t, "signed", body["signature"].(map[string]any)["value"])
 
 		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
@@ -113,11 +126,24 @@ func TestSubmitTransactionWithPATSuccess(t *testing.T) {
 	defer server.Close()
 
 	req := operon.TransactionRequest{
-		CorrelationID: "corr-1",
-		WorkstreamID:  "channel-123",
-		InteractionID: "interaction-xyz",
-		SourceDID:     "did:example:source",
-		TargetDID:     "did:example:target",
+		CorrelationID:               "corr-1",
+		WorkstreamID:                "channel-123",
+		InteractionID:               "interaction-xyz",
+		SourceDID:                   "did:example:source",
+		TargetDID:                   "did:example:target",
+		ROIBaseCost:                 11,
+		ROIBaseTime:                 9,
+		ROICostSaving:               5,
+		ROITimeSaving:               3,
+		ActorExternalID:             "agent-7",
+		ActorExternalDisplayName:    "Agent Seven",
+		ActorExternalSource:         "crm",
+		AssigneeExternalID:          "owner-8",
+		AssigneeExternalDisplayName: "Owner Eight",
+		AssigneeExternalSource:      "crm",
+		CustomerID:                  "cust-2",
+		WorkspaceID:                 "wksp-2",
+		CreatedBy:                   "user-2",
 		Signature: operon.Signature{
 			Algorithm: "EdDSA",
 			Value:     "signed",

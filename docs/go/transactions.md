@@ -11,7 +11,7 @@ This guide walks through the end-to-end flow for submitting a signed transaction
 ## 1. Install the SDK
 
 ```bash
-go get github.com/operon-cloud/operon-sdk/go@v1.2.1
+go get github.com/operon-cloud/operon-sdk/go@v1.3.0
 ```
 
 ## 2. Instantiate the client
@@ -70,6 +70,15 @@ req := operon.TransactionRequest{
     ROIClassification: operon.ROIClassificationIncrement,
     ROICost:       25,
     ROITime:       30, // seconds
+    ActorExternalID:             "agent-42",
+    ActorExternalDisplayName:    "Case Reviewer",
+    ActorExternalSource:         "crm",
+    AssigneeExternalID:          "owner-7",
+    AssigneeExternalDisplayName: "Queue Owner",
+    AssigneeExternalSource:      "crm",
+    CustomerID:                  "cust-123",
+    WorkspaceID:                 "wksp-456",
+    CreatedBy:                   "user-789",
 }
 ```
 
@@ -80,6 +89,9 @@ Key points:
 - `CorrelationID` enforces idempotency. Choose a deterministic value per logical transaction.
 - `State`, `StateID`, and `StateLabel` are optional and align with workstream state/queue analytics.
 - `ROIClassification` with `ROICost` and `ROITime` are optional and record baseline, increment, or savings value metrics (`ROITime` is in seconds).
+- Legacy ROI fields `ROIBaseCost`, `ROIBaseTime`, `ROICostSaving`, and `ROITimeSaving` are also supported for compatibility with ingestion pipelines.
+- External actor/assignee metadata is optional (`ActorExternal*`, `AssigneeExternal*`), but when either ID or display name is set, the corresponding `*Source` is required.
+- `CustomerID`, `WorkspaceID`, and `CreatedBy` are optional context fields when your integration needs to pass explicit ownership/audit metadata.
 
 ## 4. Submit the transaction
 
@@ -107,8 +119,10 @@ The returned `Transaction` struct includes consensus metadata, timestamps, and s
 | Symptom | Likely Cause | Fix |
 |---------|--------------|-----|
 | `CorrelationID is required` | Request omitted `CorrelationID` | Provide a non-empty value |
-| `interaction xyz not found` | Local cache stale | Call `client.Init` or re-run after `client.reloadReferenceData` logs refresh |
+| `interaction xyz not found` | Interaction ID missing/inaccessible for this PAT scope | Ensure the interaction exists for the authenticated workstream and call `client.Init` before submit |
 | `automatic signing disabled` | `DisableSelfSign` enabled without `Signature` provided | Either supply `Signature` manually or remove the flag |
+| `ActorExternalSource is required...` | Actor external ID/display name set without source | Provide `ActorExternalSource` whenever actor external metadata is sent |
+| `AssigneeExternalSource is required...` | Assignee external ID/display name set without source | Provide `AssigneeExternalSource` whenever assignee external metadata is sent |
 | 401/403 responses | PAT missing scope or workstream inactive | Verify credentials, workstream status, and ensure PAT header is fresh |
 
 ## Next steps

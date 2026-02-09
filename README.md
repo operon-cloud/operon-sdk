@@ -10,7 +10,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 - **Secure by default**: Consistent client initialization (timeouts, TLS, mTLS-ready) and guardrails for credential handling.
 
 > **SDK Coverage**  
-> ✅ Go (1.1.3)  
+> ✅ Go (1.3.0)  
 > ✅ Java (1.0.1)  
 > ✅ Node.js (1.0.1)  
 > ✅ .NET (1.0.1)  
@@ -57,6 +57,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("init client: %v", err)
 	}
+	defer client.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -372,13 +373,13 @@ The test suite uses `pytest` + `respx` to verify token refresh, self-signing, an
 ## Versioning & Releases
 
 - Semantic versioning (`MAJOR.MINOR.PATCH`) with Go module-aware tags (`go/vX.Y.Z`).
-- Change logs are published per release; breaking changes are documented in detail.
+- Change logs are published per release in [`CHANGELOG.md`](./CHANGELOG.md); breaking changes are documented in detail.
 - Adds compatibility tests before each release to ensure downstream services remain stable.
 
 To consume a specific version in Go, pin the tag:
 
 ```bash
-go get github.com/operon-cloud/operon-sdk/go@v1.2.1
+go get github.com/operon-cloud/operon-sdk/go@v1.3.0
 ```
 
 ---

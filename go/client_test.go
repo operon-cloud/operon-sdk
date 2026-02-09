@@ -26,16 +26,29 @@ type tokenResponse struct {
 }
 
 type transactionSubmission struct {
-	CorrelationID string           `json:"correlationId"`
-	WorkstreamID  string           `json:"workstreamId"`
-	InteractionID string           `json:"interactionId"`
-	Timestamp     string           `json:"timestamp"`
-	SourceDID     string           `json:"sourceDid"`
-	TargetDID     string           `json:"targetDid"`
-	PayloadHash   string           `json:"payloadHash"`
-	Signature     operon.Signature `json:"signature"`
-	Tags          []string         `json:"tags,omitempty"`
-	Label         string           `json:"label,omitempty"`
+	CorrelationID               string           `json:"correlationId"`
+	WorkstreamID                string           `json:"workstreamId"`
+	InteractionID               string           `json:"interactionId"`
+	Timestamp                   string           `json:"timestamp"`
+	SourceDID                   string           `json:"sourceDid"`
+	TargetDID                   string           `json:"targetDid"`
+	ROIBaseCost                 int              `json:"roiBaseCost,omitempty"`
+	ROIBaseTime                 int              `json:"roiBaseTime,omitempty"`
+	ROICostSaving               int              `json:"roiCostSaving,omitempty"`
+	ROITimeSaving               int              `json:"roiTimeSaving,omitempty"`
+	PayloadHash                 string           `json:"payloadHash"`
+	Signature                   operon.Signature `json:"signature"`
+	Tags                        []string         `json:"tags,omitempty"`
+	Label                       string           `json:"label,omitempty"`
+	ActorExternalID             string           `json:"actorExternalId,omitempty"`
+	ActorExternalDisplayName    string           `json:"actorExternalDisplayName,omitempty"`
+	ActorExternalSource         string           `json:"actorExternalSource,omitempty"`
+	AssigneeExternalID          string           `json:"assigneeExternalId,omitempty"`
+	AssigneeExternalDisplayName string           `json:"assigneeExternalDisplayName,omitempty"`
+	AssigneeExternalSource      string           `json:"assigneeExternalSource,omitempty"`
+	CustomerID                  string           `json:"customerId,omitempty"`
+	WorkspaceID                 string           `json:"workspaceId,omitempty"`
+	CreatedBy                   string           `json:"createdBy,omitempty"`
 }
 
 func newTestClient(t *testing.T, handler http.HandlerFunc, cfg operon.Config) (*operon.Client, func()) {
@@ -212,6 +225,19 @@ func TestClientSubmitTransactionWithManualSignature(t *testing.T) {
 			var body transactionSubmission
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 			require.Equal(t, "manual-signature", body.Signature.Value)
+			require.Equal(t, 15, body.ROIBaseCost)
+			require.Equal(t, 7, body.ROIBaseTime)
+			require.Equal(t, 4, body.ROICostSaving)
+			require.Equal(t, 2, body.ROITimeSaving)
+			require.Equal(t, "agent-42", body.ActorExternalID)
+			require.Equal(t, "Agent Smith", body.ActorExternalDisplayName)
+			require.Equal(t, "salesforce", body.ActorExternalSource)
+			require.Equal(t, "owner-77", body.AssigneeExternalID)
+			require.Equal(t, "Owner Jones", body.AssigneeExternalDisplayName)
+			require.Equal(t, "salesforce", body.AssigneeExternalSource)
+			require.Equal(t, "cust-1", body.CustomerID)
+			require.Equal(t, "wksp-1", body.WorkspaceID)
+			require.Equal(t, "user-1", body.CreatedBy)
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "txn-456", "status": "received", "correlationId": body.CorrelationID, "workstreamId": body.WorkstreamID, "interactionId": body.InteractionID, "sourceDid": body.SourceDID, "targetDid": body.TargetDID, "timestamp": time.Now(), "createdAt": time.Now(), "updatedAt": time.Now(), "signature": map[string]any{"algorithm": body.Signature.Algorithm, "value": body.Signature.Value}}))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
@@ -236,6 +262,19 @@ func TestClientSubmitTransactionWithManualSignature(t *testing.T) {
 			Value:     "manual-signature",
 			KeyID:     "did:example:source#keys-1",
 		},
+		ROIBaseCost:                 15,
+		ROIBaseTime:                 7,
+		ROICostSaving:               4,
+		ROITimeSaving:               2,
+		ActorExternalID:             "agent-42",
+		ActorExternalDisplayName:    "Agent Smith",
+		ActorExternalSource:         "salesforce",
+		AssigneeExternalID:          "owner-77",
+		AssigneeExternalDisplayName: "Owner Jones",
+		AssigneeExternalSource:      "salesforce",
+		CustomerID:                  "cust-1",
+		WorkspaceID:                 "wksp-1",
+		CreatedBy:                   "user-1",
 	}
 
 	txn, err := client.SubmitTransaction(ctx, req)

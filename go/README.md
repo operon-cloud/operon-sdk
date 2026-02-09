@@ -58,7 +58,7 @@ future features such as retries, tracing, or additional resource clients.
 ## Installation
 
 ```bash
-go get github.com/operon-cloud/operon-sdk/go@v1.2.1
+go get github.com/operon-cloud/operon-sdk/go@v1.3.0
 ```
 
 ## Quick Start
@@ -91,12 +91,12 @@ With an initialised client you can choose the scenario that matches your workloa
 - [Sign outgoing API calls](../docs/go/signing.md)
   - Shows how to request managed signatures, assemble the required Operon headers, and attach them to any HTTP request.
 - [Validate incoming API call signatures](../docs/go/validation.md)
-  - Walks through capturing headers, verifying the payload hash, and invoking the verification endpoint (with automatic fallback).
+  - Walks through capturing headers, verifying the payload hash, and invoking the verification endpoint.
 - PAT-only helpers: use `SignHashWithPAT` and `SubmitTransactionWithPAT` when you already have a sandbox-issued PAT and want to avoid storing client secrets.
 
 Both guides include full code samples, error-handling tips, and troubleshooting checklists.
 
-`TransactionRequest` also supports optional analytics fields (`State`, `StateID`, `StateLabel`, `ROIClassification`, `ROICost`, `ROITime`) to align submissions with value metrics and queue tracking.
+`TransactionRequest` also supports optional analytics/context fields (`State`, `StateID`, `StateLabel`, `ROIClassification`, `ROICost`, `ROITime`, legacy ROI compatibility fields, and external actor/assignee attribution). When actor or assignee ID/display-name is supplied, the matching source field is required.
 
 ## Session keep-alive & token refresh
 
@@ -136,8 +136,8 @@ go test ./...
 
 ## Roadmap
 
-- Idiomatic helpers for signing payloads (Ed25519 and ECDSA).
-- Workstream + interaction discovery helpers.
+- Batch transaction submission convenience helpers.
+- Configurable retry/backoff policy hooks for transient upstream failures.
 - Richer transaction lifecycle APIs (status polling, history).
 
 Feedback and pull requests are welcome while we shape the public SDK surface.

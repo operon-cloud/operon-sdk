@@ -99,7 +99,7 @@ cfg := operon.ClientAPIConfig{
     HTTPClient: http.DefaultClient,
 }
 
-signature, err := operon.SignHashWithPAT(ctx, cfg, patFromCookie, payloadHash, "ES256")
+signature, err := operon.SignHashWithPAT(ctx, cfg, patFromCookie, payloadHash, operon.AlgorithmES256)
 if err != nil {
     log.Fatalf("sign payload: %v", err)
 }
@@ -124,7 +124,6 @@ req := operon.TransactionRequest{
     TargetDID:     targetDID,
     Signature:     signature,
     Payload:       bytes,
-    PayloadHash:   payloadHash,
 }
 
 transaction, err := operon.SubmitTransactionWithPAT(ctx, cfg, patFromCookie, req)

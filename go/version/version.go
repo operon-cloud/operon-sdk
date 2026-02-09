@@ -2,7 +2,7 @@ package version
 
 import "strings"
 
-var buildVersion = "v1.2.1"
+var buildVersion = "v1.3.0"
 
 // String returns the semantic version of the SDK. Override via ldflags, e.g.:
 // go build -ldflags "-X github.com/operon-cloud/operon-sdk/go/version.buildVersion=v1.0.0".
