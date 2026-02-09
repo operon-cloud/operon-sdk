@@ -9,138 +9,87 @@ namespace Operon.Sdk.Models;
 /// </summary>
 public sealed class Transaction
 {
-    /// <summary>
-    /// Unique identifier assigned by Operon.
-    /// </summary>
-    public string Id { get; init; } = string.Empty;
+    private string? _workstreamId;
+    private string? _channelId;
+
+    public string Id { get; set; } = string.Empty;
+    public string CorrelationId { get; set; } = string.Empty;
+
+    [JsonPropertyName("workstreamId")]
+    public string? WorkstreamId
+    {
+        get => string.IsNullOrWhiteSpace(_workstreamId) ? null : _workstreamId;
+        set
+        {
+            _workstreamId = value;
+            if (string.IsNullOrWhiteSpace(_channelId))
+            {
+                _channelId = value;
+            }
+        }
+    }
 
     /// <summary>
-    /// Upstream correlation identifier supplied at submission time.
+    /// Legacy channel alias for backward compatibility.
     /// </summary>
-    public string CorrelationId { get; init; } = string.Empty;
+    public string? ChannelId
+    {
+        get => string.IsNullOrWhiteSpace(_channelId) ? _workstreamId : _channelId;
+        set
+        {
+            _channelId = value;
+            if (string.IsNullOrWhiteSpace(_workstreamId))
+            {
+                _workstreamId = value;
+            }
+        }
+    }
 
-    /// <summary>
-    /// Channel identifier that processed the transaction.
-    /// </summary>
-    public string ChannelId { get; init; } = string.Empty;
+    public string? WorkstreamName { get; set; }
+    public string? CustomerId { get; set; }
+    public string? WorkspaceId { get; set; }
+    public string InteractionId { get; set; } = string.Empty;
+    public DateTimeOffset Timestamp { get; set; }
+    public string SourceDid { get; set; } = string.Empty;
+    public string TargetDid { get; set; } = string.Empty;
+    public string? State { get; set; }
+    public string? StateId { get; set; }
+    public string? StateLabel { get; set; }
+    public string? RoiClassification { get; set; }
+    public int? RoiCostIncrement { get; set; }
+    public int? RoiTimeIncrement { get; set; }
+    public int? RoiCostSavings { get; set; }
+    public int? RoiTimeSavings { get; set; }
+    public int? RoiBaseCost { get; set; }
+    public int? RoiBaseTime { get; set; }
+    public int? RoiCostSaving { get; set; }
+    public int? RoiTimeSaving { get; set; }
+    public Signature Signature { get; set; } = new();
+    public string? Label { get; set; }
+    public IReadOnlyList<string>? Tags { get; set; }
+    public string PayloadHash { get; set; } = string.Empty;
+    public string? ActorExternalId { get; set; }
+    public string? ActorExternalDisplayName { get; set; }
+    public string? ActorExternalSource { get; set; }
+    public string? AssigneeExternalId { get; set; }
+    public string? AssigneeExternalDisplayName { get; set; }
+    public string? AssigneeExternalSource { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? HcsTopicId { get; set; }
+    public long? HcsSequenceNumber { get; set; }
+    public string? HcsConsensusTimestamp { get; set; }
+    public string? HcsTransactionId { get; set; }
+    public string? HcsRunningHash { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
+    public int? Version { get; set; }
 
-    /// <summary>
-    /// Customer identifier linked to the transaction, when known.
-    /// </summary>
-    public string? CustomerId { get; init; }
-        = string.Empty;
-
-    /// <summary>
-    /// Workspace identifier linked to the transaction, when known.
-    /// </summary>
-    public string? WorkspaceId { get; init; }
-        = string.Empty;
-
-    /// <summary>
-    /// Interaction identifier that describes the transaction template.
-    /// </summary>
-    public string InteractionId { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Timestamp recorded for transaction submission.
-    /// </summary>
-    public DateTimeOffset Timestamp { get; init; }
-        = DateTimeOffset.MinValue;
-
-    /// <summary>
-    /// Source DID associated with the transaction.
-    /// </summary>
-    public string SourceDid { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Target DID associated with the transaction.
-    /// </summary>
-    public string TargetDid { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Signature persisted alongside the transaction payload.
-    /// </summary>
-    public Signature Signature { get; init; } = new();
-
-    /// <summary>
-    /// Optional label displayed in Operon product surfaces.
-    /// </summary>
-    public string? Label { get; init; }
-        = string.Empty;
-
-    /// <summary>
-    /// Tags attached to the transaction for filtering.
-    /// </summary>
-    public IReadOnlyList<string>? Tags { get; init; }
-        = Array.Empty<string>();
-
-    /// <summary>
-    /// Hash of the transaction payload at submission time.
-    /// </summary>
-    public string PayloadHash { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Current processing status of the transaction.
-    /// </summary>
-    public string Status { get; init; } = string.Empty;
-
-    /// <summary>
-    /// Hedera topic identifier (when published to HCS).
-    /// </summary>
-    public string? HcsTopicId { get; init; }
-        = string.Empty;
-
-    /// <summary>
-    /// Sequence number assigned by Hedera consensus, if available.
-    /// </summary>
-    public long? HcsSequenceNumber { get; init; }
-        = null;
-
-    /// <summary>
-    /// Hedera consensus timestamp, if the transaction was mirrored.
-    /// </summary>
-    public string? HcsConsensusTimestamp { get; init; }
-        = string.Empty;
-
-    /// <summary>
-    /// Hedera transaction identifier, when available.
-    /// </summary>
-    public string? HcsTransactionId { get; init; }
-        = string.Empty;
-
-    /// <summary>
-    /// Hedera running hash captured at the time of consensus.
-    /// </summary>
-    public string? HcsRunningHash { get; init; }
-        = string.Empty;
-
-    /// <summary>
-    /// Timestamp when Operon created the record.
-    /// </summary>
-    public DateTimeOffset CreatedAt { get; init; }
-        = DateTimeOffset.MinValue;
-
-    /// <summary>
-    /// Timestamp when Operon last updated the record.
-    /// </summary>
-    public DateTimeOffset UpdatedAt { get; init; }
-        = DateTimeOffset.MinValue;
-
-    /// <summary>
-    /// Internal identifier of the creator, if captured.
-    /// </summary>
-    public string? CreatedBy { get; init; }
-        = string.Empty;
-
-    /// <summary>
-    /// Internal identifier of the last modifier, if captured.
-    /// </summary>
-    public string? UpdatedBy { get; init; }
-        = string.Empty;
-
-    /// <summary>
-    /// Version number of the record, when optimistic concurrency is used.
-    /// </summary>
-    public int? Version { get; init; }
-        = null;
+    internal void NormalizeAliases()
+    {
+        var effective = string.IsNullOrWhiteSpace(WorkstreamId) ? ChannelId : WorkstreamId;
+        WorkstreamId = effective;
+        ChannelId = effective;
+    }
 }

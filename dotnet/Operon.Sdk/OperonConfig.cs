@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Operon.Sdk.Internal;
 
 namespace Operon.Sdk;
 
@@ -21,18 +22,6 @@ public sealed class OperonConfig
     /// <summary>
     /// Initializes a new instance of the <see cref="OperonConfig"/> class.
     /// </summary>
-    /// <param name="clientId">The issued client identifier.</param>
-    /// <param name="clientSecret">The issued client secret.</param>
-    /// <param name="baseUri">Optional override for the Operon API base URI.</param>
-    /// <param name="tokenUri">Optional override for the token endpoint URI.</param>
-    /// <param name="scope">Optional OAuth scope request.</param>
-    /// <param name="audience">Optional OAuth audience values.</param>
-    /// <param name="httpTimeout">Optional HTTP timeout for outbound calls.</param>
-    /// <param name="tokenLeeway">Time window before expiry to refresh cached tokens.</param>
-    /// <param name="disableSelfSign">When true, disables automatic request signing.</param>
-    /// <param name="sessionHeartbeatInterval">Optional interval for the session heartbeat loop.</param>
-    /// <param name="sessionHeartbeatTimeout">Optional timeout applied to heartbeat invocations.</param>
-    /// <param name="sessionHeartbeatUri">Optional override for the heartbeat endpoint.</param>
     public OperonConfig(
         string clientId,
         string clientSecret,
@@ -43,29 +32,67 @@ public sealed class OperonConfig
         TimeSpan? httpTimeout = null,
         TimeSpan? tokenLeeway = null,
         bool disableSelfSign = false,
+        string? signingAlgorithm = null,
         TimeSpan? sessionHeartbeatInterval = null,
         TimeSpan? sessionHeartbeatTimeout = null,
         Uri? sessionHeartbeatUri = null)
     {
-        ClientId = string.IsNullOrWhiteSpace(clientId)
-            ? throw new ArgumentException("Client ID is required", nameof(clientId))
-            : clientId.Trim();
-        ClientSecret = string.IsNullOrWhiteSpace(clientSecret)
-            ? throw new ArgumentException("Client secret is required", nameof(clientSecret))
-            : clientSecret.Trim();
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            throw new ArgumentException("Client ID is required", nameof(clientId));
+        }
 
-        BaseUri = (baseUri ?? DefaultBaseUri).EnsureTrailingSlash();
-        TokenUri = tokenUri ?? DefaultTokenUri;
+        if (string.IsNullOrWhiteSpace(clientSecret))
+        {
+            throw new ArgumentException("Client secret is required", nameof(clientSecret));
+        }
+
+        ClientId = clientId.Trim();
+        ClientSecret = clientSecret.Trim();
+
+        BaseUri = EnsureAbsoluteUri(baseUri ?? DefaultBaseUri, nameof(baseUri)).EnsureTrailingSlash();
+        TokenUri = EnsureAbsoluteUri(tokenUri ?? DefaultTokenUri, nameof(tokenUri));
+
         Scope = string.IsNullOrWhiteSpace(scope) ? null : scope.Trim();
         Audience = audience is null ? Array.Empty<string>() : new List<string>(TrimAudience(audience));
         HttpTimeout = httpTimeout is { } timeout && timeout > TimeSpan.Zero ? timeout : TimeSpan.FromSeconds(30);
         TokenLeeway = tokenLeeway is { } leeway && leeway > TimeSpan.Zero ? leeway : TimeSpan.FromSeconds(30);
         DisableSelfSign = disableSelfSign;
-        SessionHeartbeatInterval = sessionHeartbeatInterval is { } interval && interval > TimeSpan.Zero ? interval : TimeSpan.Zero;
-        SessionHeartbeatTimeout = sessionHeartbeatTimeout is { } heartbeatTimeout && heartbeatTimeout > TimeSpan.Zero ? heartbeatTimeout : TimeSpan.FromSeconds(10);
-        SessionHeartbeatUri = SessionHeartbeatInterval > TimeSpan.Zero
-            ? (sessionHeartbeatUri ?? new Uri(BaseUri, "v1/session/heartbeat"))
-            : null;
+
+        var canonicalAlgorithm = SdkModelHelpers.CanonicalSigningAlgorithm(
+            string.IsNullOrWhiteSpace(signingAlgorithm) ? SdkModelHelpers.AlgorithmEd25519 : signingAlgorithm);
+        if (canonicalAlgorithm is null)
+        {
+            throw new ArgumentException($"Unsupported signing algorithm '{signingAlgorithm}'", nameof(signingAlgorithm));
+        }
+
+        SigningAlgorithm = canonicalAlgorithm;
+
+        if (sessionHeartbeatInterval is { } interval && interval < TimeSpan.Zero)
+        {
+            throw new ArgumentException("Session heartbeat interval cannot be negative", nameof(sessionHeartbeatInterval));
+        }
+
+        SessionHeartbeatInterval = sessionHeartbeatInterval is { } validInterval && validInterval > TimeSpan.Zero
+            ? validInterval
+            : TimeSpan.Zero;
+
+        SessionHeartbeatTimeout = SessionHeartbeatInterval > TimeSpan.Zero
+            ? (sessionHeartbeatTimeout is { } validTimeout && validTimeout > TimeSpan.Zero
+                ? validTimeout
+                : TimeSpan.FromSeconds(10))
+            : TimeSpan.Zero;
+
+        if (SessionHeartbeatInterval > TimeSpan.Zero)
+        {
+            SessionHeartbeatUri = EnsureAbsoluteUri(
+                sessionHeartbeatUri ?? new Uri(BaseUri, "v1/session/heartbeat"),
+                nameof(sessionHeartbeatUri));
+        }
+        else
+        {
+            SessionHeartbeatUri = null;
+        }
     }
 
     /// <summary>Primary API base URL, ending with a slash.</summary>
@@ -95,6 +122,9 @@ public sealed class OperonConfig
     /// <summary>When true, callers must provide signatures manually (no self-sign API usage).</summary>
     public bool DisableSelfSign { get; }
 
+    /// <summary>Default signing algorithm for automatic self-sign operations.</summary>
+    public string SigningAlgorithm { get; }
+
     /// <summary>Interval for the optional session heartbeat loop (zero to disable).</summary>
     public TimeSpan SessionHeartbeatInterval { get; }
 
@@ -114,24 +144,27 @@ public sealed class OperonConfig
             }
         }
     }
+
+    private static Uri EnsureAbsoluteUri(Uri uri, string parameterName)
+    {
+        if (!uri.IsAbsoluteUri)
+        {
+            throw new ArgumentException("URI must be absolute", parameterName);
+        }
+
+        return uri;
+    }
 }
 
-/// <summary>
-/// Extension helpers for working with <see cref="Uri"/> values.
-/// </summary>
 internal static class UriExtensions
 {
-    /// <summary>
-    /// Ensures the supplied URI ends with a trailing slash.
-    /// </summary>
-    /// <param name="uri">The URI to normalize.</param>
-    /// <returns>A URI guaranteed to contain a trailing slash.</returns>
     public static Uri EnsureTrailingSlash(this Uri uri)
     {
         if (!uri.AbsoluteUri.EndsWith("/", StringComparison.Ordinal))
         {
-            return new Uri(uri.AbsoluteUri + "/");
+            return new Uri(uri.AbsoluteUri + "/", UriKind.Absolute);
         }
+
         return uri;
     }
 }

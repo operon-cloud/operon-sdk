@@ -5,13 +5,50 @@ namespace Operon.Sdk.Models;
 /// </summary>
 public sealed class ParticipantSummary
 {
-    /// <summary>
-    /// Participant identifier referenced by interactions.
-    /// </summary>
-    public string Id { get; init; } = string.Empty;
+    private string? _workstreamId;
+    private string? _channelId;
+
+    public string Id { get; set; } = string.Empty;
+    public string Did { get; set; } = string.Empty;
+    public string? Name { get; set; }
+    public string? Status { get; set; }
+    public string? CustomerId { get; set; }
+
+    public string? WorkstreamId
+    {
+        get => string.IsNullOrWhiteSpace(_workstreamId) ? null : _workstreamId;
+        set
+        {
+            _workstreamId = value;
+            if (string.IsNullOrWhiteSpace(_channelId))
+            {
+                _channelId = value;
+            }
+        }
+    }
 
     /// <summary>
-    /// Decentralized identifier belonging to the participant.
+    /// Legacy channel alias for backward compatibility.
     /// </summary>
-    public string Did { get; init; } = string.Empty;
+    public string? ChannelId
+    {
+        get => string.IsNullOrWhiteSpace(_channelId) ? _workstreamId : _channelId;
+        set
+        {
+            _channelId = value;
+            if (string.IsNullOrWhiteSpace(_workstreamId))
+            {
+                _workstreamId = value;
+            }
+        }
+    }
+
+    public string? WorkstreamName { get; set; }
+
+    internal void NormalizeAliases()
+    {
+        var effective = string.IsNullOrWhiteSpace(WorkstreamId) ? ChannelId : WorkstreamId;
+        WorkstreamId = effective;
+        ChannelId = effective;
+    }
 }

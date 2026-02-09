@@ -13,7 +13,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 > ✅ Go (1.3.0)  
 > ✅ Java (1.3.0)  
 > ✅ Node.js (1.3.0)  
-> ✅ .NET (1.0.1)  
+> ✅ .NET (1.3.0)  
 > ✅ Rust (1.0.1)  
 > ✅ Python (1.3.0)
 
@@ -240,7 +240,7 @@ The .NET library targets **.NET 8** and mirrors the functionality available in t
 ### Installation
 
 ```bash
-dotnet add package Operon.Sdk --version 1.0.0
+dotnet add package Operon.Sdk --version 1.3.0
 ```
 
 ### Quick Start
@@ -275,7 +275,7 @@ dotnet restore
 dotnet test
 ```
 
-The solution includes `Operon.Sdk.Tests`, an xUnit project that exercises configuration defaults, token lifecycle behaviour, and transaction submission (including automatic self-signing).
+The solution includes `Operon.Sdk.Tests`, an xUnit project that now also covers PAT helpers, session validation, workstream APIs, signature header validation, and actor/assignee transaction metadata flows.
 
 ---
 

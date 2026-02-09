@@ -1,9 +1,11 @@
+using System;
+
 namespace Operon.Sdk.Models;
 
 /// <summary>
-/// Lightweight description of an interaction known to Operon.
+/// Detailed interaction record associated with a workstream.
 /// </summary>
-public sealed class InteractionSummary
+public sealed class WorkstreamInteraction
 {
     private string? _workstreamId;
     private string? _channelId;
@@ -43,16 +45,19 @@ public sealed class InteractionSummary
     public string? Name { get; set; }
     public string? Description { get; set; }
     public string? Status { get; set; }
-    public string SourceParticipantId { get; set; } = string.Empty;
-    public string TargetParticipantId { get; set; } = string.Empty;
-    public string? SourceDid { get; set; }
-    public string? TargetDid { get; set; }
+    public string? SourceParticipantId { get; set; }
+    public string? TargetParticipantId { get; set; }
+    public string[]? Workstreams { get; set; }
     public string? Type { get; set; }
     public string? Actor { get; set; }
     public string[]? States { get; set; }
     public string? RoiClassification { get; set; }
     public int? RoiCost { get; set; }
     public int? RoiTime { get; set; }
+    public string[]? Tags { get; set; }
+    public DateTimeOffset? CreatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
+    public int? Version { get; set; }
 
     internal void NormalizeAliases()
     {

@@ -5,7 +5,6 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Operon.Sdk.Auth;
-using Operon.Sdk.Models;
 using Operon.Sdk.Tests.Helpers;
 using Xunit;
 
@@ -15,6 +14,41 @@ public sealed class ClientCredentialsTokenProviderTests
 {
     [Fact]
     public async Task FetchesAndCachesToken()
+    {
+        var config = new OperonConfig("client", "secret");
+        var handler = new StubHttpMessageHandler();
+        handler.Enqueue(_ => StubHttpMessageHandler.Json(HttpStatusCode.OK, new
+        {
+            access_token = BuildToken(new
+            {
+                participant_did = "did:test:123",
+                workstream_id = "wstr-1",
+                participant_id = "part-1",
+                client_id = "client-1"
+            }),
+            expires_in = 120,
+            token_type = "Bearer"
+        }));
+
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = config.TokenUri
+        };
+
+        var provider = new ClientCredentialsTokenProvider(config, httpClient);
+        var first = await provider.GetTokenAsync(CancellationToken.None);
+        var second = await provider.GetTokenAsync(CancellationToken.None);
+
+        Assert.Equal(first.Value, second.Value);
+        Assert.Equal("did:test:123", first.ParticipantDid);
+        Assert.Equal("wstr-1", first.WorkstreamId);
+        Assert.Equal("wstr-1", first.ChannelId);
+        Assert.Equal("part-1", first.ParticipantId);
+        Assert.Equal("client-1", first.ClientId);
+    }
+
+    [Fact]
+    public async Task FallsBackToLegacyChannelClaim()
     {
         var config = new OperonConfig("client", "secret");
         var handler = new StubHttpMessageHandler();
@@ -35,12 +69,10 @@ public sealed class ClientCredentialsTokenProviderTests
         };
 
         var provider = new ClientCredentialsTokenProvider(config, httpClient);
-        var first = await provider.GetTokenAsync(CancellationToken.None);
-        var second = await provider.GetTokenAsync(CancellationToken.None);
+        var token = await provider.GetTokenAsync(CancellationToken.None);
 
-        Assert.Equal(first.Value, second.Value);
-        Assert.Equal("did:test:123", first.ParticipantDid);
-        Assert.Equal("chnl-1", first.ChannelId);
+        Assert.Equal("chnl-1", token.WorkstreamId);
+        Assert.Equal("chnl-1", token.ChannelId);
     }
 
     [Fact]

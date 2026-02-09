@@ -90,3 +90,28 @@ All notable SDK changes are documented in this file.
   - `fetchWorkstream`, `fetchWorkstreamInteractions`, `fetchWorkstreamParticipants`
   - `validateSession`
 - Added Node tests for parity surfaces and updated existing suites for workstream-first semantics.
+
+### .NET SDK
+
+- Upgraded .NET SDK to functional parity with Go `v1.3.0`.
+- Migrated transaction/catalog flows to workstream-era APIs while preserving channel aliases:
+  - reference data now loads from `/v1/interactions` and `/v1/participants`
+  - workstream APIs now support `/v1/workstreams/{workstreamId}/...`
+  - `ChannelId` remains supported as a compatibility alias for `WorkstreamId`
+- Expanded transaction request/response models with parity fields:
+  - actor/assignee attribution (`actorExternal*`, `assigneeExternal*`)
+  - state fields (`state`, `stateId`, `stateLabel`)
+  - ROI compatibility fields (`roiBaseCost`, `roiBaseTime`, `roiCostSaving`, `roiTimeSaving`)
+  - context fields (`customerId`, `workspaceId`, `createdBy`)
+- Added client-side validation parity:
+  - actor source required when actor id/display is provided
+  - assignee source required when assignee id/display is provided
+  - legacy ROI values cannot be negative
+- Added client workstream/signature parity methods:
+  - `GetWorkstreamAsync`, `GetWorkstreamInteractionsAsync`, `GetWorkstreamParticipantsAsync`
+  - `GenerateSignatureHeaders*`, `ValidateSignatureHeaders*`
+- Added PAT/session parity helpers:
+  - `PatHelpers.SignHashWithPatAsync`, `SubmitTransactionWithPatAsync`, `ValidateSignatureWithPatAsync`
+  - `PatHelpers.FetchWorkstream*` helpers and base64 payload decoder
+  - `SessionValidator.ValidateSessionAsync`
+- Updated .NET package version to `1.3.0` and refreshed docs/tests for the new API surface.

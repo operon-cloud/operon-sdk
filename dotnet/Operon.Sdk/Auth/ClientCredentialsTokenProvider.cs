@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -10,6 +9,7 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Operon.Sdk.Errors;
+using Operon.Sdk.Internal;
 using Operon.Sdk.Models;
 
 namespace Operon.Sdk.Auth;
@@ -19,46 +19,27 @@ namespace Operon.Sdk.Auth;
 /// </summary>
 public interface ITokenProvider
 {
-    /// <summary>
-    /// Retrieves a usable access token, refreshing it when the cached token is stale.
-    /// </summary>
-    /// <param name="cancellationToken">Token that cancels the asynchronous operation.</param>
-    /// <returns>The cached or freshly issued <see cref="AccessToken"/>.</returns>
     Task<AccessToken> GetTokenAsync(CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Clears any cached token, forcing the next request to fetch a fresh one.
-    /// </summary>
     void Clear();
-
-    /// <summary>
-    /// Forces issuance of a fresh token immediately, replacing the cached token.
-    /// </summary>
     Task<AccessToken> ForceRefreshAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>
-/// <see cref="ITokenProvider"/> implementation that performs the OAuth2 client credentials flow.
+/// OAuth2 client credentials token provider with in-memory caching.
 /// </summary>
 public sealed class ClientCredentialsTokenProvider : ITokenProvider
 {
     private readonly OperonConfig _config;
     private readonly HttpClient _httpClient;
-    private AccessToken? _cachedToken;
     private readonly object _gate = new();
+    private AccessToken? _cachedToken;
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ClientCredentialsTokenProvider"/> class.
-    /// </summary>
-    /// <param name="config">Runtime configuration for Operon endpoints and authentication.</param>
-    /// <param name="httpClient">HTTP client used when calling the authorization server.</param>
     public ClientCredentialsTokenProvider(OperonConfig config, HttpClient httpClient)
     {
-        _config = config;
-        _httpClient = httpClient;
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
     }
 
-    /// <inheritdoc />
     public async Task<AccessToken> GetTokenAsync(CancellationToken cancellationToken)
     {
         if (_cachedToken is { } cached && cached.ExpiresAt - _config.TokenLeeway > DateTimeOffset.UtcNow)
@@ -69,12 +50,16 @@ public sealed class ClientCredentialsTokenProvider : ITokenProvider
         return await FetchFreshTokenAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    /// <inheritdoc />
-    public void Clear() => _cachedToken = null;
+    public void Clear()
+    {
+        lock (_gate)
+        {
+            _cachedToken = null;
+        }
+    }
 
-    /// <inheritdoc />
-    public Task<AccessToken> ForceRefreshAsync(CancellationToken cancellationToken) =>
-        FetchFreshTokenAsync(cancellationToken);
+    public Task<AccessToken> ForceRefreshAsync(CancellationToken cancellationToken)
+        => FetchFreshTokenAsync(cancellationToken);
 
     private async Task<AccessToken> FetchFreshTokenAsync(CancellationToken cancellationToken)
     {
@@ -82,10 +67,11 @@ public sealed class ClientCredentialsTokenProvider : ITokenProvider
         using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
-            throw await DecodeErrorAsync(response).ConfigureAwait(false);
+            throw await SdkModelHelpers.DecodeApiErrorAsync(response).ConfigureAwait(false);
         }
 
-        var payload = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: cancellationToken).ConfigureAwait(false)
+        var payload = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: cancellationToken)
+            .ConfigureAwait(false)
             ?? throw new OperonSdkException("Token response payload was empty");
 
         if (string.IsNullOrWhiteSpace(payload.AccessToken))
@@ -93,24 +79,31 @@ public sealed class ClientCredentialsTokenProvider : ITokenProvider
             throw new OperonSdkException("Token response missing access_token");
         }
 
-        var expires = DateTimeOffset.UtcNow.AddSeconds(payload.ExpiresIn <= 0 ? 60 : payload.ExpiresIn);
-        var claims = ExtractClaims(payload.AccessToken!);
+        var expiresIn = payload.ExpiresIn <= 0 ? 60 : payload.ExpiresIn;
+        var expiresAt = DateTimeOffset.UtcNow.AddSeconds(expiresIn);
+
+        var claims = DecodedClaims.Decode(payload.AccessToken);
 
         var token = new AccessToken
         {
-            Value = payload.AccessToken!,
-            ExpiresAt = expires,
-            ParticipantDid = claims.TryGetValue("participant_did", out var did) ? did : null,
-            ChannelId = claims.TryGetValue("channel_id", out var channelId) ? channelId : null,
-            CustomerId = claims.TryGetValue("customer_id", out var customerId) ? customerId : null,
-            WorkspaceId = claims.TryGetValue("workspace_id", out var workspaceId) ? workspaceId : null,
-            Email = claims.TryGetValue("email", out var email) ? email : null,
-            Name = claims.TryGetValue("name", out var name) ? name : null,
-            MemberId = claims.TryGetValue("member_id", out var member) ? member : null,
-            SessionId = claims.TryGetValue("session_id", out var session) ? session : null,
-            OrgId = claims.TryGetValue("org_id", out var org) ? org : null,
-            TenantIds = claims.TryGetValue("tenant_ids", out var tenantCsv) ? tenantCsv?.Split(',') : Array.Empty<string>(),
-            Roles = claims.TryGetValue("roles", out var rolesCsv) ? rolesCsv?.Split(',') : Array.Empty<string>()
+            Value = payload.AccessToken,
+            ExpiresAt = expiresAt,
+            ParticipantDid = claims.ParticipantDid,
+            WorkstreamId = claims.WorkstreamId,
+            ChannelId = claims.WorkstreamId,
+            CustomerId = claims.CustomerId,
+            WorkspaceId = claims.WorkspaceId,
+            Email = claims.Email,
+            Name = claims.Name,
+            TenantIds = claims.TenantIds is string[] tenantIds ? tenantIds : new List<string>(claims.TenantIds).ToArray(),
+            Roles = claims.Roles is string[] roles ? roles : new List<string>(claims.Roles).ToArray(),
+            MemberId = claims.MemberId,
+            SessionId = claims.SessionId,
+            OrgId = claims.OrgId,
+            ParticipantId = claims.ParticipantId,
+            ClientId = claims.ClientId,
+            AuthorizedParty = claims.AuthorizedParty,
+            ExpiresAtUnix = claims.ExpiresAtUnix
         };
 
         lock (_gate)
@@ -141,90 +134,44 @@ public sealed class ClientCredentialsTokenProvider : ITokenProvider
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             return request;
         }
-        else
-        {
-            var form = new List<KeyValuePair<string, string>>
-            {
-                new("grant_type", "client_credentials")
-            };
-            if (!string.IsNullOrWhiteSpace(_config.Scope))
-            {
-                form.Add(new("scope", _config.Scope!));
-            }
-            foreach (var audience in _config.Audience)
-            {
-                form.Add(new("audience", audience));
-            }
 
-            var request = new HttpRequestMessage(HttpMethod.Post, _config.TokenUri)
-            {
-                Content = new FormUrlEncodedContent(form)
-            };
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_config.ClientId}:{_config.ClientSecret}"));
-            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
-            return request;
-        }
-    }
+        var form = new List<KeyValuePair<string, string>>
+        {
+            new("grant_type", "client_credentials")
+        };
 
-    private static async Task<OperonApiException> DecodeErrorAsync(HttpResponseMessage response)
-    {
-        var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        try
+        if (!string.IsNullOrWhiteSpace(_config.Scope))
         {
-            var json = JsonSerializer.Deserialize<JsonElement>(body);
-            var message = json.TryGetProperty("message", out var msgProp) ? msgProp.GetString() ?? response.ReasonPhrase ?? "" : response.ReasonPhrase ?? string.Empty;
-            var code = json.TryGetProperty("code", out var codeProp) ? codeProp.GetString() : null;
-            return new OperonApiException(string.IsNullOrWhiteSpace(message) ? response.StatusCode.ToString() : message, response.StatusCode, code, json);
-        }
-        catch
-        {
-            return new OperonApiException(string.IsNullOrWhiteSpace(body) ? response.StatusCode.ToString() : body, response.StatusCode);
-        }
-    }
-
-    private static Dictionary<string, string?> ExtractClaims(string token)
-    {
-        var parts = token.Split('.');
-        if (parts.Length < 2)
-        {
-            return new Dictionary<string, string?>();
+            form.Add(new KeyValuePair<string, string>("scope", _config.Scope));
         }
 
-        var payloadSegment = parts[1];
-        var buffer = Convert.FromBase64String(ToBase64(payloadSegment));
-        var json = JsonDocument.Parse(buffer);
-        var result = new Dictionary<string, string?>();
-        foreach (var property in json.RootElement.EnumerateObject())
+        foreach (var audience in _config.Audience)
         {
-            if (property.Value.ValueKind == JsonValueKind.String)
-            {
-                result[property.Name] = property.Value.GetString();
-            }
+            form.Add(new KeyValuePair<string, string>("audience", audience));
         }
-        return result;
-    }
 
-    private static string ToBase64(string segment)
-    {
-        var builder = segment.Replace('-', '+').Replace('_', '/');
-        return builder.PadRight(builder.Length + (4 - builder.Length % 4) % 4, '=');
+        var basicCredentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_config.ClientId}:{_config.ClientSecret}"));
+        var requestMessage = new HttpRequestMessage(HttpMethod.Post, _config.TokenUri)
+        {
+            Content = new FormUrlEncodedContent(form)
+        };
+        requestMessage.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Basic", basicCredentials);
+        return requestMessage;
     }
 
     private sealed record TokenResponse
     {
         [JsonPropertyName("access_token")]
-        public string? AccessToken { get; init; }
-            = string.Empty;
+        public string AccessToken { get; init; } = string.Empty;
 
         [JsonPropertyName("expires_in")]
-        public int ExpiresIn { get; init; }
-            = 60;
+        public int ExpiresIn { get; init; } = 60;
 
         [JsonPropertyName("token_type")]
         public string TokenType { get; init; } = "Bearer";
 
         [JsonPropertyName("scope")]
-        public string? Scope { get; init; } = string.Empty;
+        public string? Scope { get; init; }
     }
 }

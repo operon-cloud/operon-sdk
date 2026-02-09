@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Operon.Sdk.Models;
@@ -14,6 +15,10 @@ internal sealed class CatalogRegistry
         _interactions.Clear();
         foreach (var interaction in interactions)
         {
+            if (string.IsNullOrWhiteSpace(interaction.Id))
+            {
+                continue;
+            }
             _interactions[interaction.Id] = interaction;
         }
     }
@@ -23,6 +28,10 @@ internal sealed class CatalogRegistry
         _participants.Clear();
         foreach (var participant in participants)
         {
+            if (string.IsNullOrWhiteSpace(participant.Id))
+            {
+                continue;
+            }
             _participants[participant.Id] = participant;
         }
     }

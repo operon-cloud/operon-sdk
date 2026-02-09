@@ -1,55 +1,19 @@
 # Operon .NET SDK
 
-Modern .NET client (targeting **.NET 8**) for interacting with [Operon.Cloud](https://www.operon.cloud) services. The package mirrors the features offered by the Go, Java, and Node SDKs while embracing idiomatic .NET patterns such as dependency injection, `HttpClient`, and `System.Text.Json`.
+Modern .NET client (targeting **.NET 8**) for interacting with [Operon.Cloud](https://www.operon.cloud) services.
 
-## Project Structure
-
-```
-dotnet/
-├── Operon.Sdk/             # Core library (net8.0)
-└── Operon.Sdk.Tests/       # xUnit test suite covering configuration, token flow, and transactions
-```
-
-### Library (`Operon.Sdk`)
-- `OperonConfig` – configuration defaults & validation.
-- `OperonClient` – token-aware API client with optional self-signing support.
-- `ClientCredentialsTokenProvider` – OAuth2 client-credentials manager with proactive refresh.
-- `Models` namespace – transaction, interaction, participant, and signature DTOs.
-- `CatalogRegistry` – in-memory cache for interaction/participant metadata.
-- Rich XML docs that surface in IntelliSense for enterprise consumers.
-
-### Tests (`Operon.Sdk.Tests`)
-- Uses xUnit and stub `HttpMessageHandler` implementations to simulate authentication & API endpoints.
-- Validates configuration defaults, token caching semantics, and transaction submission (manual + self-sign).
-
-## Getting Started
+## Installation
 
 ```bash
-# Restore packages and run the test suite
-cd dotnet
-dotnet restore
-dotnet test
-```
-
-To build and publish locally:
-
-```bash
-dotnet build Operon.Sdk/Operon.Sdk.csproj -c Release
-dotnet pack Operon.Sdk/Operon.Sdk.csproj -c Release -o ./nupkg
-```
-
-Add the package to your application (once published to NuGet):
-
-```xml
-<ItemGroup>
-  <PackageReference Include="Operon.Sdk" Version="1.0.2" />
-</ItemGroup>
+dotnet add package Operon.Sdk --version 1.3.0
 ```
 
 ## Quick Start
 
 ```csharp
 using Operon.Sdk;
+using Operon.Sdk.Models;
+using System.Text.Json;
 
 var config = new OperonConfig(
     clientId: Environment.GetEnvironmentVariable("OPERON_CLIENT_ID")!,
@@ -59,42 +23,87 @@ var config = new OperonConfig(
 await using var client = new OperonClient(config);
 await client.InitAsync();
 
-var response = await client.SubmitTransactionAsync(new TransactionRequest
+var transaction = await client.SubmitTransactionAsync(new TransactionRequest
 {
     CorrelationId = "corr-123",
     InteractionId = "int-abc",
-    PayloadBytes = JsonSerializer.SerializeToUtf8Bytes(new { foo = "bar" })
-}, CancellationToken.None);
+    PayloadBytes = JsonSerializer.SerializeToUtf8Bytes(new { foo = "bar" }),
+    State = "Qualified",
+    ActorExternalId = "agent-12",
+    ActorExternalDisplayName = "Agent 12",
+    ActorExternalSource = "crm",
+    AssigneeExternalId = "owner-2",
+    AssigneeExternalDisplayName = "Owner Two",
+    AssigneeExternalSource = "crm"
+});
 
-Console.WriteLine($"Transaction {response.Id} status={response.Status}");
+Console.WriteLine($"Transaction {transaction.Id} status={transaction.Status} workstream={transaction.WorkstreamId}");
 ```
 
-> **Security note**
-> The .NET SDK mirrors the Go implementation: it hashes payload bytes locally and only transmits the hash (`payloadHash`) to Operon. Raw payloads stay within your application boundary.
+The SDK hashes payload bytes locally (`SHA-256`) and submits only `payloadHash` to Operon.
 
-### Keep sessions warm
-
-Set `sessionHeartbeatInterval` on `OperonConfig` to enable a background heartbeat that pings `/v1/session/heartbeat` and forces a token refresh whenever Operon returns 401:
+## Workstream APIs
 
 ```csharp
-var config = new OperonConfig(
-    clientId: "...",
-    clientSecret: "...",
-    sessionHeartbeatInterval: TimeSpan.FromMinutes(2)
+var workstream = await client.GetWorkstreamAsync();
+var interactions = await client.GetWorkstreamInteractionsAsync();
+var participants = await client.GetWorkstreamParticipantsAsync();
+```
+
+## Signature APIs
+
+```csharp
+var headers = await client.GenerateSignatureHeadersFromStringAsync(
+    payload: JsonSerializer.Serialize(new { demo = true }),
+    algorithm: "ES256"
+);
+
+var validation = await client.ValidateSignatureHeadersFromStringAsync(
+    payload: JsonSerializer.Serialize(new { demo = true }),
+    headers: headers
 );
 ```
 
-## Versioning & Packaging
+## PAT and Session Helpers
 
-- Target runtime: **.NET 8 (LTS)**
-- Nullable reference types & implicit usings enabled by default.
-- `GenerateDocumentationFile` ensures XML docs are emitted for downstream tooling.
+PAT-scoped operations are available via static helpers:
 
-## Next Steps
+```csharp
+using Operon.Sdk;
 
-- Wire into CI for automated `dotnet test` and `dotnet pack` runs.
-- Publish pre-release builds to a private NuGet feed for early adopters.
+var signature = await PatHelpers.SignHashWithPatAsync(...);
+var txn = await PatHelpers.SubmitTransactionWithPatAsync(...);
+var ws = await PatHelpers.FetchWorkstreamAsync(...);
+var info = await SessionValidator.ValidateSessionAsync(...);
+```
 
-—
+Included helpers:
+- `PatHelpers.SignHashWithPatAsync`
+- `PatHelpers.SubmitTransactionWithPatAsync`
+- `PatHelpers.ValidateSignatureWithPatAsync`
+- `PatHelpers.FetchWorkstream*`
+- `SessionValidator.ValidateSessionAsync`
 
-Find SDKs for other languages and developer resources at https://www.operon.cloud/developers
+## Compatibility
+
+`ChannelId` remains supported as a compatibility alias for `WorkstreamId` in token claims and transaction/reference models.
+
+## Build and Test
+
+```bash
+cd dotnet
+dotnet restore
+DOTNET_ROLL_FORWARD=Major dotnet test ../operon-sdk.sln
+```
+
+## Project Layout
+
+```
+dotnet/
+├── Operon.Sdk/             # Core library (net8.0)
+└── Operon.Sdk.Tests/       # xUnit test suite
+```
+
+## License
+
+Apache-2.0 — see [LICENSE](../LICENSE).
