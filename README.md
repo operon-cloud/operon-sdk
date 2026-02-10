@@ -28,7 +28,7 @@ Transactions support optional workstream analytics metadata such as state/queue 
 ### Installation
 
 ```bash
-go get github.com/operon-cloud/operon-sdk/go@latest
+go get github.com/operon-cloud/operon-sdk/go@v1.3.0
 ```
 
 Ensure your Go toolchain is at least **Go 1.25** (matching the module’s `go.mod` requirement).
@@ -189,7 +189,7 @@ The Node package delivers a modern, ESM-first client tailored for Node.js 20+ an
 ### Installation
 
 ```bash
-npm install @operoncloud/operon-sdk
+npm install @operoncloud/operon-sdk@1.3.0
 ```
 
 ### Quick Start
@@ -334,7 +334,7 @@ The Python package targets **Python 3.10+** and provides async APIs built on `ht
 ### Installation
 
 ```bash
-pip install operon-sdk
+pip install operon-sdk==1.3.0
 ```
 
 ### Quick Start

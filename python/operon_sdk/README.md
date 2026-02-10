@@ -6,7 +6,7 @@ Targets Python **3.10+** and now aligns functionally with the Go SDK `v1.3.0`.
 ## Installation
 
 ```bash
-pip install operon-sdk
+pip install operon-sdk==1.3.0
 ```
 
 For local development:
