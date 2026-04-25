@@ -145,6 +145,7 @@ public static class PatHelpers
             RoiClassification = TrimOrNull(request.RoiClassification),
             RoiCost = request.RoiCost,
             RoiTime = request.RoiTime,
+            ActiveTimeSeconds = request.ActiveTimeSeconds,
             State = TrimOrNull(request.State),
             StateId = TrimOrNull(request.StateId),
             StateLabel = TrimOrNull(request.StateLabel),
@@ -530,6 +531,7 @@ public static class PatHelpers
         public string? RoiClassification { get; init; }
         public int? RoiCost { get; init; }
         public int? RoiTime { get; init; }
+        public int? ActiveTimeSeconds { get; init; }
         public string? State { get; init; }
         public string? StateId { get; init; }
         public string? StateLabel { get; init; }

@@ -93,6 +93,7 @@ public final class PatHelpers {
             .roiClassification(request.getRoiClassification())
             .roiCost(request.getRoiCost())
             .roiTime(request.getRoiTime())
+            .activeTimeSeconds(request.getActiveTimeSeconds())
             .state(request.getState())
             .stateId(request.getStateId())
             .stateLabel(request.getStateLabel())
@@ -129,6 +130,7 @@ public final class PatHelpers {
             validated.getRoiClassification(),
             validated.getRoiCost(),
             validated.getRoiTime(),
+            validated.getActiveTimeSeconds(),
             validated.getState(),
             validated.getStateId(),
             validated.getStateLabel(),
@@ -486,6 +488,7 @@ public final class PatHelpers {
         String roiClassification,
         Integer roiCost,
         Integer roiTime,
+        Integer activeTimeSeconds,
         String state,
         String stateId,
         String stateLabel,

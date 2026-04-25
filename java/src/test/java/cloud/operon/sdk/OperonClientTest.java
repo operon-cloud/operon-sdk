@@ -109,6 +109,7 @@ class OperonClientTest {
             .roiBaseTime(5)
             .roiCostSaving(3)
             .roiTimeSaving(2)
+            .activeTimeSeconds(42)
             .actorExternalId("agent-1")
             .actorExternalDisplayName("Agent One")
             .actorExternalSource("crm")
@@ -138,6 +139,7 @@ class OperonClientTest {
         assertEquals("Test submission", submission.path("label").asText());
         assertEquals("priority: high", submission.path("tags").get(0).asText());
         assertEquals(7, submission.path("roiBaseCost").asInt());
+        assertEquals(42, submission.path("activeTimeSeconds").asInt());
         assertEquals("agent-1", submission.path("actorExternalId").asText());
         assertEquals("owner-2", submission.path("assigneeExternalId").asText());
 

@@ -527,6 +527,7 @@ function deserializeTransaction(payload: Record<string, unknown>): Transaction {
     roiTimeIncrement: asNumber(payload.roiTimeIncrement),
     roiCostSavings: asNumber(payload.roiCostSavings),
     roiTimeSavings: asNumber(payload.roiTimeSavings),
+    activeTimeSeconds: asNumber(payload.activeTimeSeconds),
     roiBaseCost: asNumber(payload.roiBaseCost),
     roiBaseTime: asNumber(payload.roiBaseTime),
     roiCostSaving: asNumber(payload.roiCostSaving),

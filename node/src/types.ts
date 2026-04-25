@@ -92,6 +92,7 @@ export interface TransactionRequest {
   roiClassification?: string;
   roiCost?: number;
   roiTime?: number;
+  activeTimeSeconds?: number;
   state?: string;
   stateId?: string;
   stateLabel?: string;
@@ -138,6 +139,7 @@ export interface Transaction {
   roiTimeIncrement?: number;
   roiCostSavings?: number;
   roiTimeSavings?: number;
+  activeTimeSeconds?: number;
   roiBaseCost?: number;
   roiBaseTime?: number;
   roiCostSaving?: number;

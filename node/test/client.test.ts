@@ -85,6 +85,7 @@ describe('OperonClient', () => {
         expect(body.assigneeExternalId).toBe('owner-2');
         expect(body.assigneeExternalDisplayName).toBe('Owner Two');
         expect(body.assigneeExternalSource).toBe('crm');
+        expect(body.activeTimeSeconds).toBe(42);
 
         return buildResponse({
           ...body,
@@ -118,10 +119,12 @@ describe('OperonClient', () => {
       actorExternalSource: 'crm',
       assigneeExternalId: 'owner-2',
       assigneeExternalDisplayName: 'Owner Two',
-      assigneeExternalSource: 'crm'
+      assigneeExternalSource: 'crm',
+      activeTimeSeconds: 42
     });
 
     expect(result.id).toBe('txn-123');
+    expect(result.activeTimeSeconds).toBe(42);
     expect(result.signature.value).toBe('signed-value');
     expect(result.signature.keyId).toBe('did:example:source#keys-1');
     expect(fetchImpl).toHaveBeenCalledTimes(5);

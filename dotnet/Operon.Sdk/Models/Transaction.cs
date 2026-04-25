@@ -60,6 +60,7 @@ public sealed class Transaction
     public int? RoiTimeIncrement { get; set; }
     public int? RoiCostSavings { get; set; }
     public int? RoiTimeSavings { get; set; }
+    public int? ActiveTimeSeconds { get; set; }
     public int? RoiBaseCost { get; set; }
     public int? RoiBaseTime { get; set; }
     public int? RoiCostSaving { get; set; }

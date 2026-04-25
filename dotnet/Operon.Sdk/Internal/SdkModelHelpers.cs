@@ -228,6 +228,11 @@ internal static class SdkModelHelpers
             throw new ValidationException("ROITimeSaving cannot be negative");
         }
 
+        if (request.ActiveTimeSeconds is < 0)
+        {
+            throw new ValidationException("ActiveTimeSeconds cannot be negative");
+        }
+
         if (string.IsNullOrWhiteSpace(request.ActorExternalSource)
             && (!string.IsNullOrWhiteSpace(request.ActorExternalId)
                 || !string.IsNullOrWhiteSpace(request.ActorExternalDisplayName)))

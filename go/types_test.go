@@ -159,10 +159,11 @@ func TestTransactionUnmarshalIncludesExternalAndLegacyROIFields(t *testing.T) {
 		"sourceDid":"did:example:source",
 		"targetDid":"did:example:target",
 		"roiBaseCost":13,
-		"roiBaseTime":21,
-		"roiCostSaving":8,
-		"roiTimeSaving":5,
-		"actorExternalId":"actor-1",
+			"roiBaseTime":21,
+			"roiCostSaving":8,
+			"roiTimeSaving":5,
+			"activeTimeSeconds":42,
+			"actorExternalId":"actor-1",
 		"actorExternalDisplayName":"Actor One",
 		"actorExternalSource":"crm",
 		"assigneeExternalId":"assignee-1",
@@ -181,6 +182,8 @@ func TestTransactionUnmarshalIncludesExternalAndLegacyROIFields(t *testing.T) {
 	require.Equal(t, 21, txn.ROIBaseTime)
 	require.Equal(t, 8, txn.ROICostSaving)
 	require.Equal(t, 5, txn.ROITimeSaving)
+	require.NotNil(t, txn.ActiveTimeSeconds)
+	require.Equal(t, 42, *txn.ActiveTimeSeconds)
 	require.Equal(t, "actor-1", txn.ActorExternalID)
 	require.Equal(t, "Actor One", txn.ActorExternalDisplayName)
 	require.Equal(t, "crm", txn.ActorExternalSource)

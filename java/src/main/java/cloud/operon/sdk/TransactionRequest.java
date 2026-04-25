@@ -27,6 +27,7 @@ public final class TransactionRequest {
     private final String roiClassification;
     private final Integer roiCost;
     private final Integer roiTime;
+    private final Integer activeTimeSeconds;
     private final String state;
     private final String stateId;
     private final String stateLabel;
@@ -59,6 +60,7 @@ public final class TransactionRequest {
         this.roiClassification = builder.roiClassification;
         this.roiCost = builder.roiCost;
         this.roiTime = builder.roiTime;
+        this.activeTimeSeconds = builder.activeTimeSeconds;
         this.state = builder.state;
         this.stateId = builder.stateId;
         this.stateLabel = builder.stateLabel;
@@ -127,6 +129,10 @@ public final class TransactionRequest {
 
     public Integer getRoiTime() {
         return roiTime;
+    }
+
+    public Integer getActiveTimeSeconds() {
+        return activeTimeSeconds;
     }
 
     public String getState() {
@@ -259,6 +265,9 @@ public final class TransactionRequest {
         if (roiTimeSaving != null && roiTimeSaving < 0) {
             throw new OperonException("ROITimeSaving cannot be negative");
         }
+        if (activeTimeSeconds != null && activeTimeSeconds < 0) {
+            throw new OperonException("ActiveTimeSeconds cannot be negative");
+        }
         if (isBlank(actorExternalSource) && (!isBlank(actorExternalId) || !isBlank(actorExternalDisplayName))) {
             throw new OperonException(
                 "ActorExternalSource is required when ActorExternalID or ActorExternalDisplayName is set"
@@ -333,6 +342,7 @@ public final class TransactionRequest {
         private String roiClassification;
         private Integer roiCost;
         private Integer roiTime;
+        private Integer activeTimeSeconds;
         private String state;
         private String stateId;
         private String stateLabel;
@@ -407,6 +417,11 @@ public final class TransactionRequest {
 
         public Builder roiTime(Integer roiTime) {
             this.roiTime = roiTime;
+            return this;
+        }
+
+        public Builder activeTimeSeconds(Integer activeTimeSeconds) {
+            this.activeTimeSeconds = activeTimeSeconds;
             return this;
         }
 

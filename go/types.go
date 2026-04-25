@@ -71,6 +71,7 @@ type Transaction struct {
 	ROITimeIncrement            int               `json:"roiTimeIncrement,omitempty"`
 	ROICostSavings              int               `json:"roiCostSavings,omitempty"`
 	ROITimeSavings              int               `json:"roiTimeSavings,omitempty"`
+	ActiveTimeSeconds           *int              `json:"activeTimeSeconds,omitempty"`
 	ROIBaseCost                 int               `json:"roiBaseCost,omitempty"`
 	ROIBaseTime                 int               `json:"roiBaseTime,omitempty"`
 	ROICostSaving               int               `json:"roiCostSaving,omitempty"`
@@ -109,6 +110,7 @@ type TransactionRequest struct {
 	ROIClassification           ROIClassification `json:"roiClassification,omitempty"`
 	ROICost                     int               `json:"roiCost,omitempty"`
 	ROITime                     int               `json:"roiTime,omitempty"`
+	ActiveTimeSeconds           *int              `json:"activeTimeSeconds,omitempty"`
 	State                       string            `json:"state,omitempty"`
 	StateID                     string            `json:"stateId,omitempty"`
 	StateLabel                  string            `json:"stateLabel,omitempty"`
@@ -232,6 +234,7 @@ type transactionSubmission struct {
 	ROIClassification           ROIClassification `json:"roiClassification,omitempty"`
 	ROICost                     int               `json:"roiCost,omitempty"`
 	ROITime                     int               `json:"roiTime,omitempty"`
+	ActiveTimeSeconds           *int              `json:"activeTimeSeconds,omitempty"`
 	State                       string            `json:"state,omitempty"`
 	StateID                     string            `json:"stateId,omitempty"`
 	StateLabel                  string            `json:"stateLabel,omitempty"`
@@ -290,6 +293,9 @@ func (r TransactionRequest) ValidateForSubmit() error {
 		if !isROIClassification(r.ROIClassification) {
 			return fmt.Errorf("ROIClassification must be one of baseline, increment, savings")
 		}
+	}
+	if r.ActiveTimeSeconds != nil && *r.ActiveTimeSeconds < 0 {
+		return errors.New("ActiveTimeSeconds cannot be negative")
 	}
 	if r.ROIBaseCost < 0 {
 		return errors.New("ROIBaseCost cannot be negative")

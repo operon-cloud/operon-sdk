@@ -81,6 +81,7 @@ class Transaction(BaseModel):
     roi_time_increment: int = Field(default=0, alias="roiTimeIncrement")
     roi_cost_savings: int = Field(default=0, alias="roiCostSavings")
     roi_time_savings: int = Field(default=0, alias="roiTimeSavings")
+    active_time_seconds: Optional[int] = Field(default=None, alias="activeTimeSeconds")
 
     roi_base_cost: int = Field(default=0, alias="roiBaseCost")
     roi_base_time: int = Field(default=0, alias="roiBaseTime")
@@ -129,6 +130,7 @@ class TransactionRequest(BaseModel):
     roi_classification: str = Field(default="", alias="roiClassification")
     roi_cost: int = Field(default=0, alias="roiCost")
     roi_time: int = Field(default=0, alias="roiTime")
+    active_time_seconds: Optional[int] = Field(default=None, alias="activeTimeSeconds")
 
     state: str = ""
     state_id: str = Field(default="", alias="stateId")
@@ -253,6 +255,9 @@ class TransactionRequest(BaseModel):
 
         if self.roi_classification and not is_roi_classification(self.roi_classification):
             raise ValueError("ROIClassification must be one of baseline, increment, savings")
+
+        if self.active_time_seconds is not None and self.active_time_seconds < 0:
+            raise ValueError("ActiveTimeSeconds cannot be negative")
 
         if self.roi_base_cost < 0:
             raise ValueError("ROIBaseCost cannot be negative")

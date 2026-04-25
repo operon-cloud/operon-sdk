@@ -52,6 +52,7 @@ interface TransactionResponse {
   roiTimeIncrement?: number;
   roiCostSavings?: number;
   roiTimeSavings?: number;
+  activeTimeSeconds?: number;
   roiBaseCost?: number;
   roiBaseTime?: number;
   roiCostSaving?: number;

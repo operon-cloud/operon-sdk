@@ -96,7 +96,7 @@ With an initialised client you can choose the scenario that matches your workloa
 
 Both guides include full code samples, error-handling tips, and troubleshooting checklists.
 
-`TransactionRequest` also supports optional analytics/context fields (`State`, `StateID`, `StateLabel`, `ROIClassification`, `ROICost`, `ROITime`, legacy ROI compatibility fields, and external actor/assignee attribution). When actor or assignee ID/display-name is supplied, the matching source field is required.
+`TransactionRequest` also supports optional analytics/context fields (`State`, `StateID`, `StateLabel`, `ROIClassification`, `ROICost`, `ROITime`, `ActiveTimeSeconds`, legacy ROI compatibility fields, and external actor/assignee attribution). `ActiveTimeSeconds` is the observed handle time for the submitted touch event. When actor or assignee ID/display-name is supplied, the matching source field is required.
 
 ## Session keep-alive & token refresh
 

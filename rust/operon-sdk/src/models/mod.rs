@@ -128,6 +128,12 @@ pub struct Transaction {
     )]
     pub roi_time_savings: Option<i64>,
     #[serde(
+        rename = "activeTimeSeconds",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub active_time_seconds: Option<i64>,
+    #[serde(
         rename = "roiBaseCost",
         default,
         skip_serializing_if = "Option::is_none"
@@ -361,6 +367,7 @@ pub struct TransactionRequest {
     pub roi_classification: Option<String>,
     pub roi_cost: Option<i64>,
     pub roi_time: Option<i64>,
+    pub active_time_seconds: Option<i64>,
     pub state: Option<String>,
     pub state_id: Option<String>,
     pub state_label: Option<String>,
@@ -410,6 +417,7 @@ impl TransactionRequest {
             roi_classification: None,
             roi_cost: None,
             roi_time: None,
+            active_time_seconds: None,
             state: None,
             state_id: None,
             state_label: None,
@@ -456,6 +464,11 @@ impl TransactionRequest {
 
     pub fn with_state(mut self, state: impl Into<String>) -> Self {
         self.state = Some(state.into());
+        self
+    }
+
+    pub fn with_active_time_seconds(mut self, active_time_seconds: i64) -> Self {
+        self.active_time_seconds = Some(active_time_seconds);
         self
     }
 
@@ -615,6 +628,11 @@ impl TransactionRequest {
         if self.roi_time_saving.unwrap_or(0) < 0 {
             return Err(OperonError::validation("ROITimeSaving cannot be negative"));
         }
+        if self.active_time_seconds.unwrap_or(0) < 0 {
+            return Err(OperonError::validation(
+                "ActiveTimeSeconds cannot be negative",
+            ));
+        }
 
         if trim_opt(self.actor_external_source.clone()).is_none()
             && (trim_opt(self.actor_external_id.clone()).is_some()
@@ -686,6 +704,7 @@ impl TransactionRequest {
             roi_classification: trim_opt(self.roi_classification.clone()),
             roi_cost: self.roi_cost,
             roi_time: self.roi_time,
+            active_time_seconds: self.active_time_seconds,
             state: trim_opt(self.state.clone()),
             state_id: trim_opt(self.state_id.clone()),
             state_label: trim_opt(self.state_label.clone()),
@@ -735,6 +754,8 @@ pub struct TransactionSubmission {
     pub roi_cost: Option<i64>,
     #[serde(rename = "roiTime", skip_serializing_if = "Option::is_none")]
     pub roi_time: Option<i64>,
+    #[serde(rename = "activeTimeSeconds", skip_serializing_if = "Option::is_none")]
+    pub active_time_seconds: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
     #[serde(rename = "stateId", skip_serializing_if = "Option::is_none")]

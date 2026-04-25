@@ -163,7 +163,8 @@ async fn submit_transaction_self_sign_uses_workstream_catalog_and_extended_field
         .with_assignee_external("jira", "assignee-1", "Case Owner")
         .with_customer_id("cust-1")
         .with_workspace_id("ws-1")
-        .with_created_by("system");
+        .with_created_by("system")
+        .with_active_time_seconds(42);
     request.roi_base_cost = Some(100);
     request.roi_base_time = Some(20);
     request.roi_cost_saving = Some(15);
@@ -186,6 +187,7 @@ async fn submit_transaction_self_sign_uses_workstream_catalog_and_extended_field
     assert_eq!(body["assigneeExternalId"], "assignee-1");
     assert_eq!(body["stateId"], "state-1");
     assert_eq!(body["roiBaseCost"], 100);
+    assert_eq!(body["activeTimeSeconds"], 42);
     assert!(body.get("channelId").is_none());
 }
 

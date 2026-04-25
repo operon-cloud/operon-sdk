@@ -61,6 +61,23 @@ class TransactionRequestTest {
     }
 
     @Test
+    void rejectsNegativeActiveTimeSeconds() {
+        TransactionRequest request = TransactionRequest.builder()
+            .correlationId("corr")
+            .workstreamId("wstr")
+            .interactionId("intr")
+            .sourceDid("did:test:source")
+            .targetDid("did:test:target")
+            .signature(new Signature("EdDSA", "value", "key"))
+            .payloadHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            .activeTimeSeconds(-1)
+            .build();
+
+        OperonException ex = assertThrows(OperonException.class, request::validateForSubmit);
+        assertTrue(ex.getMessage().contains("ActiveTimeSeconds"));
+    }
+
+    @Test
     void requiresActorAndAssigneeSourceWhenIdentifiersSet() {
         TransactionRequest actorRequest = TransactionRequest.builder()
             .correlationId("corr")

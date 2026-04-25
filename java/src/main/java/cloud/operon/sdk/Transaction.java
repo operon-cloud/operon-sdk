@@ -28,6 +28,7 @@ public record Transaction(
     Integer roiTimeIncrement,
     Integer roiCostSavings,
     Integer roiTimeSavings,
+    Integer activeTimeSeconds,
     Integer roiBaseCost,
     Integer roiBaseTime,
     Integer roiCostSaving,

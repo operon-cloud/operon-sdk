@@ -231,6 +231,7 @@ public final class OperonClient implements AutoCloseable {
             .roiClassification(request.getRoiClassification())
             .roiCost(request.getRoiCost())
             .roiTime(request.getRoiTime())
+            .activeTimeSeconds(request.getActiveTimeSeconds())
             .state(request.getState())
             .stateId(request.getStateId())
             .stateLabel(request.getStateLabel())
@@ -265,6 +266,7 @@ public final class OperonClient implements AutoCloseable {
             validated.getRoiClassification(),
             validated.getRoiCost(),
             validated.getRoiTime(),
+            validated.getActiveTimeSeconds(),
             validated.getState(),
             validated.getStateId(),
             validated.getStateLabel(),
@@ -917,6 +919,7 @@ public final class OperonClient implements AutoCloseable {
         String roiClassification,
         Integer roiCost,
         Integer roiTime,
+        Integer activeTimeSeconds,
         String state,
         String stateId,
         String stateLabel,

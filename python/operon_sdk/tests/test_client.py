@@ -91,6 +91,7 @@ async def test_submit_transaction_self_sign_with_actor_assignee_fields():
             assert body["assigneeExternalDisplayName"] == "Owner Two"
             assert body["assigneeExternalSource"] == "crm"
             assert body["signature"]["keyId"] == "did:test:source#keys-1"
+            assert body["activeTimeSeconds"] == 42
 
             return Response(
                 200,
@@ -107,6 +108,7 @@ async def test_submit_transaction_self_sign_with_actor_assignee_fields():
                         "value": "signed-value",
                         "keyId": "did:test:source#keys-1",
                     },
+                    "activeTimeSeconds": 42,
                     "payloadHash": body["payloadHash"],
                     "status": "received",
                 },
@@ -124,9 +126,11 @@ async def test_submit_transaction_self_sign_with_actor_assignee_fields():
         req.assignee_external_id = "owner-2"
         req.assignee_external_display_name = "Owner Two"
         req.assignee_external_source = "crm"
+        req.active_time_seconds = 42
 
         txn = await client.submit_transaction(req)
         assert txn.id == "txn-1"
+        assert txn.active_time_seconds == 42
         assert txn.status == "received"
 
 

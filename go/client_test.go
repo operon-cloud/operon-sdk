@@ -36,6 +36,7 @@ type transactionSubmission struct {
 	ROIBaseTime                 int              `json:"roiBaseTime,omitempty"`
 	ROICostSaving               int              `json:"roiCostSaving,omitempty"`
 	ROITimeSaving               int              `json:"roiTimeSaving,omitempty"`
+	ActiveTimeSeconds           *int             `json:"activeTimeSeconds,omitempty"`
 	PayloadHash                 string           `json:"payloadHash"`
 	Signature                   operon.Signature `json:"signature"`
 	Tags                        []string         `json:"tags,omitempty"`
@@ -178,6 +179,8 @@ func TestClientSubmitTransactionWithSelfSigning(t *testing.T) {
 		Payload:       []byte("hello world"),
 		Tags:          []string{" env:demo ", ""},
 	}
+	activeTimeSeconds := 42
+	req.ActiveTimeSeconds = &activeTimeSeconds
 
 	txn, err := client.SubmitTransaction(ctx, req)
 	require.NoError(t, err)
@@ -186,6 +189,8 @@ func TestClientSubmitTransactionWithSelfSigning(t *testing.T) {
 	require.Equal(t, "channel-abc", txn.WorkstreamID)
 	require.Equal(t, "did:example:target", txn.TargetDID)
 	require.Equal(t, []string{"env:demo"}, captured.Tags)
+	require.NotNil(t, captured.ActiveTimeSeconds)
+	require.Equal(t, 42, *captured.ActiveTimeSeconds)
 	require.Equal(t, int32(1), atomic.LoadInt32(&tokenCalls))
 
 	interactions, err := client.Interactions(ctx)

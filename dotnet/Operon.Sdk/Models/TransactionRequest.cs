@@ -87,6 +87,12 @@ public sealed class TransactionRequest
     public int? RoiTime { get; set; }
 
     /// <summary>
+    /// Optional observed active handle time for this exact touch transaction, in seconds.
+    /// </summary>
+    [JsonPropertyName("activeTimeSeconds")]
+    public int? ActiveTimeSeconds { get; set; }
+
+    /// <summary>
     /// Optional state label for transaction status modeling.
     /// </summary>
     public string? State { get; set; }

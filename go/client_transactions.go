@@ -91,6 +91,7 @@ func (c *Client) SubmitTransaction(ctx context.Context, req TransactionRequest) 
 		ROIClassification:           req.ROIClassification,
 		ROICost:                     req.ROICost,
 		ROITime:                     req.ROITime,
+		ActiveTimeSeconds:           req.ActiveTimeSeconds,
 		State:                       req.State,
 		StateID:                     req.StateID,
 		StateLabel:                  req.StateLabel,

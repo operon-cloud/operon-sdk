@@ -27,6 +27,7 @@ export interface TransactionSubmission {
   roiClassification?: string;
   roiCost?: number;
   roiTime?: number;
+  activeTimeSeconds?: number;
   state?: string;
   stateId?: string;
   stateLabel?: string;
@@ -135,6 +136,10 @@ export function validateTransactionRequestForSubmit(request: TransactionRequest)
     throw new ValidationError('ROIClassification must be one of baseline, increment, savings');
   }
 
+  if ((request.activeTimeSeconds ?? 0) < 0) {
+    throw new ValidationError('ActiveTimeSeconds cannot be negative');
+  }
+
   if ((request.roiBaseCost ?? 0) < 0) {
     throw new ValidationError('ROIBaseCost cannot be negative');
   }
@@ -185,6 +190,7 @@ export function buildTransactionSubmission(
     roiClassification: request.roiClassification?.trim() || undefined,
     roiCost: request.roiCost,
     roiTime: request.roiTime,
+    activeTimeSeconds: request.activeTimeSeconds,
     state: request.state?.trim() || undefined,
     stateId: request.stateId?.trim() || undefined,
     stateLabel: request.stateLabel?.trim() || undefined,

@@ -148,6 +148,7 @@ class OperonClient:
             "roiClassification": request.roi_classification,
             "roiCost": request.roi_cost,
             "roiTime": request.roi_time,
+            "activeTimeSeconds": request.active_time_seconds,
             "state": request.state,
             "stateId": request.state_id,
             "stateLabel": request.state_label,

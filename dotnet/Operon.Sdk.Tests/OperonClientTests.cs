@@ -82,6 +82,7 @@ public sealed class OperonClientTests
             Assert.Equal("owner-2", body.GetProperty("assigneeExternalId").GetString());
             Assert.Equal("crm", body.GetProperty("assigneeExternalSource").GetString());
             Assert.Equal("did:test:source#keys-1", body.GetProperty("signature").GetProperty("keyId").GetString());
+            Assert.Equal(42, body.GetProperty("activeTimeSeconds").GetInt32());
 
             return StubHttpMessageHandler.Json(HttpStatusCode.OK, new
             {
@@ -93,6 +94,7 @@ public sealed class OperonClientTests
                 sourceDid = "did:test:source",
                 targetDid = "did:test:target",
                 signature = new { algorithm = "EdDSA", value = "signed-value", keyId = "did:test:source#keys-1" },
+                activeTimeSeconds = 42,
                 payloadHash = body.GetProperty("payloadHash").GetString(),
                 status = "PENDING",
                 createdAt = DateTimeOffset.UtcNow,
@@ -117,13 +119,15 @@ public sealed class OperonClientTests
             ActorExternalSource = "crm",
             AssigneeExternalId = "owner-2",
             AssigneeExternalDisplayName = "Owner Two",
-            AssigneeExternalSource = "crm"
+            AssigneeExternalSource = "crm",
+            ActiveTimeSeconds = 42
         }, CancellationToken.None);
 
         Assert.Equal("txn-1", result.Id);
         Assert.Equal("wstr-1", result.WorkstreamId);
         Assert.Equal("wstr-1", result.ChannelId);
         Assert.Equal("signed-value", result.Signature.Value);
+        Assert.Equal(42, result.ActiveTimeSeconds);
     }
 
     [Fact]
