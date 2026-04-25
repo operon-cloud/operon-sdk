@@ -154,6 +154,10 @@ public final class OperonClient implements AutoCloseable {
                 item.type(),
                 item.actor(),
                 item.states(),
+                item.fromStateId(),
+                item.fromStateLabel(),
+                item.toStateId(),
+                item.toStateLabel(),
                 item.roiClassification(),
                 item.roiCost(),
                 item.roiTime()
@@ -619,6 +623,10 @@ public final class OperonClient implements AutoCloseable {
                         node.path("type").asText(null),
                         node.path("actor").asText(null),
                         readStringArray(node.path("states")),
+                        node.path("fromStateId").asText(null),
+                        node.path("fromStateLabel").asText(null),
+                        node.path("toStateId").asText(null),
+                        node.path("toStateLabel").asText(null),
                         node.path("roiClassification").asText(null),
                         node.path("roiCost").isInt() ? node.path("roiCost").asInt() : null,
                         node.path("roiTime").isInt() ? node.path("roiTime").asInt() : null

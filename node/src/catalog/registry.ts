@@ -14,6 +14,10 @@ export interface InteractionMetadata {
   type?: string;
   actor?: string;
   states?: string[];
+  fromStateId?: string;
+  fromStateLabel?: string;
+  toStateId?: string;
+  toStateLabel?: string;
   roiClassification?: string;
   roiCost?: number;
   roiTime?: number;
@@ -85,6 +89,10 @@ export class Registry {
       type: item.type,
       actor: item.actor,
       states: item.states ? [...item.states] : undefined,
+      fromStateId: item.fromStateId,
+      fromStateLabel: item.fromStateLabel,
+      toStateId: item.toStateId,
+      toStateLabel: item.toStateLabel,
       roiClassification: item.roiClassification,
       roiCost: item.roiCost,
       roiTime: item.roiTime

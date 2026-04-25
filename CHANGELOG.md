@@ -4,6 +4,8 @@ All notable SDK changes are documented in this file.
 
 ## Unreleased
 
+- Added `movement` interaction type constants for all SDK catalog/type consumers.
+- Exposed movement route fields on SDK interaction catalog and workstream interaction projections.
 - Added `activeTimeSeconds` / `active_time_seconds` transaction support across Go, Node, Python, Java, .NET, and Rust SDKs so callers can submit observed touch duration per transaction.
 - Added client-side validation that active time cannot be negative.
 

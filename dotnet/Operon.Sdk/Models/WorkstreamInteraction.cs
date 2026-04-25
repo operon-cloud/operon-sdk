@@ -51,6 +51,10 @@ public sealed class WorkstreamInteraction
     public string? Type { get; set; }
     public string? Actor { get; set; }
     public string[]? States { get; set; }
+    public string? FromStateId { get; set; }
+    public string? FromStateLabel { get; set; }
+    public string? ToStateId { get; set; }
+    public string? ToStateLabel { get; set; }
     public string? RoiClassification { get; set; }
     public int? RoiCost { get; set; }
     public int? RoiTime { get; set; }

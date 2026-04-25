@@ -25,11 +25,12 @@ const (
 	ROIClassificationSavings   ROIClassification = "savings"
 )
 
-// InteractionType describes whether an interaction represents a touch, transition, or transfer event.
+// InteractionType describes whether an interaction represents work or movement.
 type InteractionType string
 
 const (
 	InteractionTypeTouch      InteractionType = "touch"
+	InteractionTypeMovement   InteractionType = "movement"
 	InteractionTypeTransition InteractionType = "transition"
 	InteractionTypeTransfer   InteractionType = "transfer"
 )
@@ -148,6 +149,10 @@ type InteractionSummary struct {
 	Type                InteractionType
 	Actor               InteractionActor
 	States              []string
+	FromStateID         string
+	FromStateLabel      string
+	ToStateID           string
+	ToStateLabel        string
 	ROIClassification   ROIClassification
 	ROICost             int
 	ROITime             int

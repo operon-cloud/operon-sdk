@@ -16,6 +16,11 @@ pub const ROI_CLASSIFICATION_BASELINE: &str = "baseline";
 pub const ROI_CLASSIFICATION_INCREMENT: &str = "increment";
 pub const ROI_CLASSIFICATION_SAVINGS: &str = "savings";
 
+pub const INTERACTION_TYPE_TOUCH: &str = "touch";
+pub const INTERACTION_TYPE_MOVEMENT: &str = "movement";
+pub const INTERACTION_TYPE_TRANSITION: &str = "transition";
+pub const INTERACTION_TYPE_TRANSFER: &str = "transfer";
+
 pub const HEADER_OPERON_DID: &str = "X-Operon-DID";
 pub const HEADER_OPERON_PAYLOAD_HASH: &str = "X-Operon-Payload-Hash";
 pub const HEADER_OPERON_SIGNATURE: &str = "X-Operon-Signature";
@@ -289,6 +294,26 @@ pub struct InteractionSummary {
     pub actor: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub states: Vec<String>,
+    #[serde(
+        rename = "fromStateId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub from_state_id: Option<String>,
+    #[serde(
+        rename = "fromStateLabel",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub from_state_label: Option<String>,
+    #[serde(rename = "toStateId", default, skip_serializing_if = "Option::is_none")]
+    pub to_state_id: Option<String>,
+    #[serde(
+        rename = "toStateLabel",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub to_state_label: Option<String>,
     #[serde(
         rename = "roiClassification",
         default,
@@ -932,6 +957,26 @@ pub struct WorkstreamInteraction {
     pub actor: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub states: Vec<String>,
+    #[serde(
+        rename = "fromStateId",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub from_state_id: Option<String>,
+    #[serde(
+        rename = "fromStateLabel",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub from_state_label: Option<String>,
+    #[serde(rename = "toStateId", default, skip_serializing_if = "Option::is_none")]
+    pub to_state_id: Option<String>,
+    #[serde(
+        rename = "toStateLabel",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub to_state_label: Option<String>,
     #[serde(
         rename = "roiClassification",
         default,

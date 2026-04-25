@@ -94,6 +94,10 @@ interface InteractionsResponse {
     type?: string;
     actor?: string;
     states?: string[];
+    fromStateId?: string;
+    fromStateLabel?: string;
+    toStateId?: string;
+    toStateLabel?: string;
     roiClassification?: string;
     roiCost?: number;
     roiTime?: number;
@@ -746,6 +750,10 @@ export class OperonClient {
         type: item.type,
         actor: item.actor,
         states: Array.isArray(item.states) ? item.states.filter((entry) => !!entry) : undefined,
+        fromStateId: item.fromStateId,
+        fromStateLabel: item.fromStateLabel,
+        toStateId: item.toStateId,
+        toStateLabel: item.toStateLabel,
         roiClassification: item.roiClassification,
         roiCost: item.roiCost,
         roiTime: item.roiTime
@@ -886,6 +894,10 @@ function deserializeWorkstreamInteraction(payload: Record<string, unknown>): Wor
     type: asString(payload.type),
     actor: asString(payload.actor),
     states: asStringArray(payload.states),
+    fromStateId: asString(payload.fromStateId),
+    fromStateLabel: asString(payload.fromStateLabel),
+    toStateId: asString(payload.toStateId),
+    toStateLabel: asString(payload.toStateLabel),
     roiClassification: asString(payload.roiClassification),
     roiCost: asNumber(payload.roiCost),
     roiTime: asNumber(payload.roiTime),

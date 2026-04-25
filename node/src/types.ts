@@ -26,6 +26,7 @@ export const ROI_CLASSIFICATIONS = [
 export type ROIClassification = (typeof ROI_CLASSIFICATIONS)[number];
 
 export const INTERACTION_TYPE_TOUCH = 'touch';
+export const INTERACTION_TYPE_MOVEMENT = 'movement';
 export const INTERACTION_TYPE_TRANSITION = 'transition';
 export const INTERACTION_TYPE_TRANSFER = 'transfer';
 
@@ -185,6 +186,10 @@ export interface InteractionSummary {
   type?: string;
   actor?: string;
   states?: string[];
+  fromStateId?: string;
+  fromStateLabel?: string;
+  toStateId?: string;
+  toStateLabel?: string;
   roiClassification?: string;
   roiCost?: number;
   roiTime?: number;
@@ -244,6 +249,10 @@ export interface WorkstreamInteraction {
   type?: string;
   actor?: string;
   states?: string[];
+  fromStateId?: string;
+  fromStateLabel?: string;
+  toStateId?: string;
+  toStateLabel?: string;
   roiClassification?: string;
   roiCost?: number;
   roiTime?: number;

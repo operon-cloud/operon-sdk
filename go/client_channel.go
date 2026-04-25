@@ -28,6 +28,10 @@ type WorkstreamInteraction struct {
 	Type                InteractionType   `json:"type,omitempty"`
 	Actor               InteractionActor  `json:"actor,omitempty"`
 	States              []string          `json:"states,omitempty"`
+	FromStateID         string            `json:"fromStateId,omitempty"`
+	FromStateLabel      string            `json:"fromStateLabel,omitempty"`
+	ToStateID           string            `json:"toStateId,omitempty"`
+	ToStateLabel        string            `json:"toStateLabel,omitempty"`
 	ROIClassification   ROIClassification `json:"roiClassification,omitempty"`
 	ROICost             int               `json:"roiCost,omitempty"`
 	ROITime             int               `json:"roiTime,omitempty"`

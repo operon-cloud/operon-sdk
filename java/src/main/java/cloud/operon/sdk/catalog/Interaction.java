@@ -16,10 +16,56 @@ public record Interaction(
     String type,
     String actor,
     List<String> states,
+    String fromStateId,
+    String fromStateLabel,
+    String toStateId,
+    String toStateLabel,
     String roiClassification,
     Integer roiCost,
     Integer roiTime
 ) {
+    public Interaction(
+        String id,
+        String workstreamId,
+        String workstreamName,
+        String name,
+        String description,
+        String status,
+        String sourceParticipantId,
+        String targetParticipantId,
+        String sourceDid,
+        String targetDid,
+        String type,
+        String actor,
+        List<String> states,
+        String roiClassification,
+        Integer roiCost,
+        Integer roiTime
+    ) {
+        this(
+            id,
+            workstreamId,
+            workstreamName,
+            name,
+            description,
+            status,
+            sourceParticipantId,
+            targetParticipantId,
+            sourceDid,
+            targetDid,
+            type,
+            actor,
+            states,
+            null,
+            null,
+            null,
+            null,
+            roiClassification,
+            roiCost,
+            roiTime
+        );
+    }
+
     public Interaction withSourceDid(String did) {
         return new Interaction(
             id,
@@ -35,6 +81,10 @@ public record Interaction(
             type,
             actor,
             states,
+            fromStateId,
+            fromStateLabel,
+            toStateId,
+            toStateLabel,
             roiClassification,
             roiCost,
             roiTime
@@ -56,6 +106,10 @@ public record Interaction(
             type,
             actor,
             states,
+            fromStateId,
+            fromStateLabel,
+            toStateId,
+            toStateLabel,
             roiClassification,
             roiCost,
             roiTime
