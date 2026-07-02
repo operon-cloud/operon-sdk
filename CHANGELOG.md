@@ -9,6 +9,19 @@ All notable SDK changes are documented in this file.
 - Added `activeTimeSeconds` / `active_time_seconds` transaction support across Go, Node, Python, Java, .NET, and Rust SDKs so callers can submit observed touch duration per transaction.
 - Added client-side validation that active time cannot be negative.
 
+## v1.4.0 - 2026-07-02
+
+### Go SDK
+
+- Added injectable auth through `TokenProvider`, `Token`, and `Config.TokenProvider` so server-side integrations can supply scoped short-lived PATs instead of configuring SDK-owned client credentials.
+- Added token claim propagation for participant, workstream, workspace, customer, identity, tenant, role, session, and org metadata, with JWT claim fallback when providers only return an access token.
+- Kept transaction submission hash-only: the Go SDK continues to submit `payloadHash` and does not send `payloadData`.
+- Kept one provider token per `SubmitTransaction` operation, including managed self-signing and transaction creation.
+- Added optional injected-provider `ForceRefresh(ctx)` support for heartbeat-driven refresh without adding it to the public `TokenProvider` interface.
+- Added `activeTimeSeconds` transaction request/response support and client-side validation that active time cannot be negative.
+- Added `movement` interaction type support for Go catalog/type consumers.
+- Improved managed self-signing failures when the access token does not include a participant DID.
+
 ## v1.3.0 - 2026-02-09
 
 ### Go SDK

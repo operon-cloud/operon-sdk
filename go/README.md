@@ -58,7 +58,7 @@ future features such as retries, tracing, or additional resource clients.
 ## Installation
 
 ```bash
-go get github.com/operon-cloud/operon-sdk/go@v1.3.0
+go get github.com/operon-cloud/operon-sdk/go@v1.4.0
 ```
 
 ## Quick Start
