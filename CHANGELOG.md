@@ -9,6 +9,22 @@ All notable SDK changes are documented in this file.
 - Added `activeTimeSeconds` / `active_time_seconds` transaction support across Go, Node, Python, Java, .NET, and Rust SDKs so callers can submit observed touch duration per transaction.
 - Added client-side validation that active time cannot be negative.
 
+## v1.4.1 - 2026-07-02
+
+### Go SDK
+
+- Exposed full Workstream state catalog fields returned by client-api:
+  - `states[].sourceCode`
+  - `states[].slaClockStart`
+  - `states[].slaClockStop`
+- Added Workstream state lookup helpers:
+  - `FindState`
+  - `FindStateByName`
+  - `FindStateBySourceCode`
+  - `DefaultState`
+  - `ActiveStates`
+- Kept transaction submission state behavior server-authoritative: the SDK does not submit `sourceCode` or synthesize state defaults.
+
 ## v1.4.0 - 2026-07-02
 
 ### Go SDK

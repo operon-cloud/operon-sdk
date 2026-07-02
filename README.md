@@ -10,7 +10,7 @@ Modern companies rely on verifiable, event-driven data flows. Operon SDK gives p
 - **Secure by default**: Consistent client initialization (timeouts, TLS, mTLS-ready) and guardrails for credential handling.
 
 > **SDK Coverage**<br>
-> ✅ Go (1.4.0)<br>
+> ✅ Go (1.4.1)<br>
 > ✅ Java (1.3.0)<br>
 > ✅ Node.js (1.3.0)<br>
 > ✅ .NET (1.3.0)<br>
@@ -28,7 +28,7 @@ Transactions support optional workstream analytics metadata such as state/queue 
 ### Installation
 
 ```bash
-go get github.com/operon-cloud/operon-sdk/go@v1.4.0
+go get github.com/operon-cloud/operon-sdk/go@v1.4.1
 ```
 
 Ensure your Go toolchain is at least **Go 1.25** (matching the module’s `go.mod` requirement).
@@ -381,7 +381,7 @@ The test suite uses `pytest` + `respx` to verify token refresh, self-signing, an
 To consume a specific version in Go, pin the tag:
 
 ```bash
-go get github.com/operon-cloud/operon-sdk/go@v1.4.0
+go get github.com/operon-cloud/operon-sdk/go@v1.4.1
 ```
 
 ---
