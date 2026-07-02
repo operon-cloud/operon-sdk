@@ -45,6 +45,9 @@ func (c *Client) SubmitTransaction(ctx context.Context, req TransactionRequest) 
 
 	signature := req.Signature
 	if c.selfSigning && strings.TrimSpace(signature.Value) == "" {
+		if strings.TrimSpace(c.cachedParticipantDID()) == "" {
+			return nil, errors.New("participant DID unavailable on access token")
+		}
 		signed, signErr := c.signer.Sign(ctx, token, payloadHash, c.signingAlgorithm)
 		if signErr != nil {
 			if errors.Is(signErr, signing.ErrSigningDisabled) {

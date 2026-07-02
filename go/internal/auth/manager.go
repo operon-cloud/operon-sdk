@@ -21,19 +21,21 @@ const defaultLeeway = 30 * time.Second
 // Token captures an access token together with the derived participant DID (if
 // available) and expiry metadata for proactive refresh decisions.
 type Token struct {
-	AccessToken    string
-	ParticipantDID string
-	WorkstreamID   string
-	CustomerID     string
-	WorkspaceID    string
-	Email          string
-	Name           string
-	TenantIDs      []string
-	Roles          []string
-	MemberID       string
-	SessionID      string
-	OrgID          string
-	Expiry         time.Time
+	AccessToken     string
+	ParticipantDID  string
+	ParticipantID   string
+	ParticipantName string
+	WorkstreamID    string
+	CustomerID      string
+	WorkspaceID     string
+	Email           string
+	Name            string
+	TenantIDs       []string
+	Roles           []string
+	MemberID        string
+	SessionID       string
+	OrgID           string
+	Expiry          time.Time
 }
 
 // Provider exposes the contract for retrieving access tokens.
@@ -195,19 +197,21 @@ func (m *ClientCredentialsManager) fetchToken(ctx context.Context) (Token, error
 	claims := DecodeTokenClaims(accessToken)
 
 	token := Token{
-		AccessToken:    accessToken,
-		ParticipantDID: claims.ParticipantDID,
-		WorkstreamID:   claims.WorkstreamID,
-		CustomerID:     claims.CustomerID,
-		WorkspaceID:    claims.WorkspaceID,
-		Email:          claims.Email,
-		Name:           claims.Name,
-		TenantIDs:      append([]string(nil), claims.TenantIDs...),
-		Roles:          append([]string(nil), claims.Roles...),
-		MemberID:       claims.MemberID,
-		SessionID:      claims.SessionID,
-		OrgID:          claims.OrgID,
-		Expiry:         time.Now().Add(expiresIn),
+		AccessToken:     accessToken,
+		ParticipantDID:  claims.ParticipantDID,
+		ParticipantID:   claims.ParticipantID,
+		ParticipantName: claims.ParticipantName,
+		WorkstreamID:    claims.WorkstreamID,
+		CustomerID:      claims.CustomerID,
+		WorkspaceID:     claims.WorkspaceID,
+		Email:           claims.Email,
+		Name:            claims.Name,
+		TenantIDs:       append([]string(nil), claims.TenantIDs...),
+		Roles:           append([]string(nil), claims.Roles...),
+		MemberID:        claims.MemberID,
+		SessionID:       claims.SessionID,
+		OrgID:           claims.OrgID,
+		Expiry:          time.Now().Add(expiresIn),
 	}
 	return token, nil
 }
@@ -235,6 +239,7 @@ type Claims struct {
 	SessionID          string   `json:"session_id"`
 	OrgID              string   `json:"org_id"`
 	ParticipantID      string   `json:"participant_id"`
+	ParticipantName    string   `json:"participant_name"`
 	ClientID           string   `json:"client_id"`
 	AuthorizedParty    string   `json:"azp"`
 	ExpiresAt          int64    `json:"exp"`

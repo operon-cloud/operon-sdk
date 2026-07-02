@@ -40,10 +40,6 @@ func (c *Client) Interactions(ctx context.Context) ([]InteractionSummary, error)
 			Type:                InteractionType(item.Type),
 			Actor:               InteractionActor(item.Actor),
 			States:              append([]string(nil), item.States...),
-			FromStateID:         item.FromStateID,
-			FromStateLabel:      item.FromStateLabel,
-			ToStateID:           item.ToStateID,
-			ToStateLabel:        item.ToStateLabel,
 			ROIClassification:   ROIClassification(item.ROIClassification),
 			ROICost:             item.ROICost,
 			ROITime:             item.ROITime,
@@ -261,10 +257,6 @@ func (c *Client) fetchInteractions(ctx context.Context, token string) ([]catalog
 			Type                catalog.InteractionType   `json:"type"`
 			Actor               catalog.InteractionActor  `json:"actor"`
 			States              []string                  `json:"states"`
-			FromStateID         string                    `json:"fromStateId"`
-			FromStateLabel      string                    `json:"fromStateLabel"`
-			ToStateID           string                    `json:"toStateId"`
-			ToStateLabel        string                    `json:"toStateLabel"`
 			ROIClassification   catalog.ROIClassification `json:"roiClassification"`
 			ROICost             int                       `json:"roiCost"`
 			ROITime             int                       `json:"roiTime"`
@@ -290,10 +282,6 @@ func (c *Client) fetchInteractions(ctx context.Context, token string) ([]catalog
 			Type:                item.Type,
 			Actor:               item.Actor,
 			States:              append([]string(nil), item.States...),
-			FromStateID:         item.FromStateID,
-			FromStateLabel:      item.FromStateLabel,
-			ToStateID:           item.ToStateID,
-			ToStateLabel:        item.ToStateLabel,
 			ROIClassification:   item.ROIClassification,
 			ROICost:             item.ROICost,
 			ROITime:             item.ROITime,

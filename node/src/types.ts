@@ -8,7 +8,7 @@ export const ALGORITHM_ES256K = 'ES256K';
 export const SIGNING_ALGORITHMS = [
   DEFAULT_SIGNING_ALGORITHM,
   ALGORITHM_ES256,
-  ALGORITHM_ES256K
+  ALGORITHM_ES256K,
 ] as const;
 
 export type SigningAlgorithm = (typeof SIGNING_ALGORITHMS)[number];
@@ -20,7 +20,7 @@ export const ROI_CLASSIFICATION_SAVINGS = 'savings';
 export const ROI_CLASSIFICATIONS = [
   ROI_CLASSIFICATION_BASELINE,
   ROI_CLASSIFICATION_INCREMENT,
-  ROI_CLASSIFICATION_SAVINGS
+  ROI_CLASSIFICATION_SAVINGS,
 ] as const;
 
 export type ROIClassification = (typeof ROI_CLASSIFICATIONS)[number];
@@ -186,10 +186,6 @@ export interface InteractionSummary {
   type?: string;
   actor?: string;
   states?: string[];
-  fromStateId?: string;
-  fromStateLabel?: string;
-  toStateId?: string;
-  toStateLabel?: string;
   roiClassification?: string;
   roiCost?: number;
   roiTime?: number;
@@ -249,10 +245,6 @@ export interface WorkstreamInteraction {
   type?: string;
   actor?: string;
   states?: string[];
-  fromStateId?: string;
-  fromStateLabel?: string;
-  toStateId?: string;
-  toStateLabel?: string;
   roiClassification?: string;
   roiCost?: number;
   roiTime?: number;

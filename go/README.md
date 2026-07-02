@@ -82,6 +82,42 @@ if err := client.Init(ctx); err != nil {
 }
 ```
 
+### Advanced: injected token provider
+
+Server-side integrations that already own short-lived PAT acquisition can inject
+a provider instead of configuring client credentials:
+
+```go
+type ServiceTokenProvider struct {
+    // add service clients and cache state here
+}
+
+func (p *ServiceTokenProvider) Token(ctx context.Context) (operon.Token, error) {
+    pat, expiresAt, err := p.mintScopedPAT(ctx)
+    if err != nil {
+        return operon.Token{}, err
+    }
+    return operon.Token{
+        AccessToken:    pat,
+        ExpiresAt:      expiresAt,
+        ParticipantDID: "did:operon:example:customer",
+        WorkstreamID:   "wstr-123",
+        WorkspaceID:    "wksp-123",
+        CustomerID:     "cust-123",
+    }, nil
+}
+
+client, err := operon.NewClient(operon.Config{
+    BaseURL:       os.Getenv("OPERON_CLIENT_API_URL"),
+    TokenProvider: &ServiceTokenProvider{},
+})
+```
+
+Do not set `ClientID` or `ClientSecret` when `TokenProvider` is configured. The
+provider owns acquisition, caching, and refresh policy. For a single
+`SubmitTransaction` call, the SDK uses one provider token for managed
+self-signing and transaction submission.
+
 With an initialised client you can choose the scenario that matches your workload:
 
 - [Submit a transaction to the Client API](../docs/go/transactions.md)
@@ -109,8 +145,13 @@ The SDK will:
 
 1. Reuse the cached PAT from the underlying token manager.
 2. Call `GET {BaseURL}/v1/session/heartbeat` on the configured interval.
-3. If the server returns `401`, force-mint a fresh PAT via the client-credentials
-   grant so subsequent requests succeed without manual retries.
+3. If the server returns `401`, ask the configured token source for fresh
+   credentials before subsequent requests.
+
+With client credentials, the built-in token manager force-mints a replacement
+PAT. With an injected token provider, the provider owns cache invalidation and
+refresh policy; providers that also implement `ForceRefresh(ctx)` can use that
+hook to bypass their cache after heartbeat authorization failures.
 
 Heartbeat defaults to disabled to avoid extra network chatter. Set the interval
 to a value such as `2 * time.Minute` when your integration benefits from

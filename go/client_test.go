@@ -63,11 +63,13 @@ func newTestClient(t *testing.T, handler http.HandlerFunc, cfg operon.Config) (*
 	if cfg.TokenURL == "" {
 		cfg.TokenURL = srv.URL + "/token"
 	}
-	if cfg.ClientID == "" {
-		cfg.ClientID = "test-client"
-	}
-	if cfg.ClientSecret == "" {
-		cfg.ClientSecret = "test-secret"
+	if cfg.TokenProvider == nil {
+		if cfg.ClientID == "" {
+			cfg.ClientID = "test-client"
+		}
+		if cfg.ClientSecret == "" {
+			cfg.ClientSecret = "test-secret"
+		}
 	}
 
 	client, err := operon.NewClient(cfg)
@@ -79,6 +81,276 @@ func newTestClient(t *testing.T, handler http.HandlerFunc, cfg operon.Config) (*
 	}
 
 	return client, cleanup
+}
+
+type rotatingTokenProvider struct {
+	tokens []operon.Token
+	err    error
+	calls  atomic.Int32
+}
+
+func (p *rotatingTokenProvider) Token(context.Context) (operon.Token, error) {
+	if p.err != nil {
+		return operon.Token{}, p.err
+	}
+	if len(p.tokens) == 0 {
+		return operon.Token{}, fmt.Errorf("no tokens configured")
+	}
+	call := int(p.calls.Add(1)) - 1
+	if call >= len(p.tokens) {
+		call = len(p.tokens) - 1
+	}
+	return p.tokens[call], nil
+}
+
+func TestClientSubmitTransactionWithInjectedTokenProvider(t *testing.T) {
+	token := newTokenWithClaims(map[string]any{
+		"participant_did": "did:example:source",
+		"workstream_id":   "wstr-injected",
+		"customer_id":     "cust-1",
+		"workspace_id":    "wksp-1",
+	})
+	provider := &rotatingTokenProvider{tokens: []operon.Token{{
+		AccessToken:    token,
+		ExpiresAt:      time.Now().Add(time.Hour),
+		ParticipantDID: "did:example:source",
+		WorkstreamID:   "wstr-injected",
+		CustomerID:     "cust-1",
+		WorkspaceID:    "wksp-1",
+	}}}
+
+	var signAuth string
+	var submitAuth string
+	var captured transactionSubmission
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			t.Fatalf("token endpoint should not be called in injected-token mode")
+		case "/v1/interactions":
+			require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
+			payload := map[string]any{
+				"data": []map[string]any{{
+					"id":                  "intr-injected",
+					"workstreamId":        "wstr-injected",
+					"sourceParticipantId": "participant-src",
+					"targetParticipantId": "participant-tgt",
+				}},
+			}
+			require.NoError(t, json.NewEncoder(w).Encode(payload))
+		case "/v1/participants":
+			require.Equal(t, "Bearer "+token, r.Header.Get("Authorization"))
+			payload := map[string]any{
+				"data": []map[string]any{
+					{"id": "participant-src", "did": "did:example:source"},
+					{"id": "participant-tgt", "did": "did:example:target"},
+				},
+			}
+			require.NoError(t, json.NewEncoder(w).Encode(payload))
+		case "/v1/dids/self/sign":
+			signAuth = r.Header.Get("Authorization")
+			require.Equal(t, "Bearer "+token, signAuth)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"signature": map[string]any{
+					"algorithm": operon.AlgorithmEd25519,
+					"value":     "injected-signature",
+					"keyId":     "did:example:source#keys-1",
+				},
+			}))
+		case "/v1/transactions":
+			submitAuth = r.Header.Get("Authorization")
+			require.Equal(t, "Bearer "+token, submitAuth)
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			var bodyMap map[string]any
+			require.NoError(t, json.Unmarshal(body, &bodyMap))
+			require.NotContains(t, bodyMap, "payloadData")
+			require.NoError(t, json.Unmarshal(body, &captured))
+
+			now := time.Now().UTC()
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"id":            "txn-injected",
+				"correlationId": captured.CorrelationID,
+				"workstreamId":  captured.WorkstreamID,
+				"interactionId": captured.InteractionID,
+				"sourceDid":     captured.SourceDID,
+				"targetDid":     captured.TargetDID,
+				"signature":     captured.Signature,
+				"payloadHash":   captured.PayloadHash,
+				"status":        "received",
+				"timestamp":     now,
+				"createdAt":     now,
+				"updatedAt":     now,
+			}))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	client, cleanup := newTestClient(t, handler, operon.Config{TokenProvider: provider})
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	txn, err := client.SubmitTransaction(ctx, operon.TransactionRequest{
+		CorrelationID: "corr-injected",
+		InteractionID: "intr-injected",
+		Payload:       []byte(`{"event":"submitted"}`),
+	})
+	require.NoError(t, err)
+	require.Equal(t, "txn-injected", txn.ID)
+	require.Equal(t, "wstr-injected", captured.WorkstreamID)
+	require.Equal(t, "did:example:source", captured.SourceDID)
+	require.Equal(t, "did:example:target", captured.TargetDID)
+	require.Equal(t, signAuth, submitAuth)
+}
+
+func TestClientSubmitTransactionUsesSameInjectedTokenForSignAndSubmit(t *testing.T) {
+	tokens := make([]operon.Token, 0, 4)
+	for i := 1; i <= 4; i++ {
+		value := newTokenWithClaims(map[string]any{
+			"participant_did": "did:example:source",
+			"workstream_id":   "wstr-injected",
+			"token_index":     i,
+		})
+		tokens = append(tokens, operon.Token{
+			AccessToken:    value,
+			ExpiresAt:      time.Now().Add(time.Hour),
+			ParticipantDID: "did:example:source",
+			WorkstreamID:   "wstr-injected",
+		})
+	}
+	provider := &rotatingTokenProvider{tokens: tokens}
+
+	var signAuth string
+	var submitAuth string
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/interactions":
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{{
+					"id":                  "intr-injected",
+					"workstreamId":        "wstr-injected",
+					"sourceParticipantId": "participant-src",
+					"targetParticipantId": "participant-tgt",
+				}},
+			}))
+		case "/v1/participants":
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
+					{"id": "participant-src", "did": "did:example:source"},
+					{"id": "participant-tgt", "did": "did:example:target"},
+				},
+			}))
+		case "/v1/dids/self/sign":
+			signAuth = r.Header.Get("Authorization")
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"signature": map[string]any{
+					"algorithm": operon.AlgorithmEd25519,
+					"value":     "same-token-signature",
+				},
+			}))
+		case "/v1/transactions":
+			submitAuth = r.Header.Get("Authorization")
+			var captured transactionSubmission
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&captured))
+			now := time.Now().UTC()
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"id":            "txn-same-token",
+				"correlationId": captured.CorrelationID,
+				"workstreamId":  captured.WorkstreamID,
+				"interactionId": captured.InteractionID,
+				"sourceDid":     captured.SourceDID,
+				"targetDid":     captured.TargetDID,
+				"signature":     captured.Signature,
+				"payloadHash":   captured.PayloadHash,
+				"status":        "received",
+				"timestamp":     now,
+				"createdAt":     now,
+				"updatedAt":     now,
+			}))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	client, cleanup := newTestClient(t, handler, operon.Config{TokenProvider: provider})
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, err := client.SubmitTransaction(ctx, operon.TransactionRequest{
+		CorrelationID: "corr-same-token",
+		InteractionID: "intr-injected",
+		Payload:       []byte("payload"),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, signAuth)
+	require.Equal(t, signAuth, submitAuth)
+}
+
+func TestClientSubmitTransactionWithInjectedTokenRequiresParticipantDIDForSelfSigning(t *testing.T) {
+	token := newTokenWithoutParticipantDID()
+	provider := &rotatingTokenProvider{tokens: []operon.Token{{
+		AccessToken:  token,
+		ExpiresAt:    time.Now().Add(time.Hour),
+		WorkstreamID: "wstr-injected",
+	}}}
+	var signCalls atomic.Int32
+	var submitCalls atomic.Int32
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/interactions":
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{{
+					"id":                  "intr-injected",
+					"workstreamId":        "wstr-injected",
+					"sourceParticipantId": "participant-src",
+					"targetParticipantId": "participant-tgt",
+				}},
+			}))
+		case "/v1/participants":
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
+					{"id": "participant-src", "did": "did:example:source"},
+					{"id": "participant-tgt", "did": "did:example:target"},
+				},
+			}))
+		case "/v1/dids/self/sign":
+			signCalls.Add(1)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"signature": map[string]any{
+					"algorithm": operon.AlgorithmEd25519,
+					"value":     "unexpected-signature",
+				},
+			}))
+		case "/v1/transactions":
+			submitCalls.Add(1)
+			w.WriteHeader(http.StatusCreated)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	client, cleanup := newTestClient(t, handler, operon.Config{TokenProvider: provider})
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, err := client.SubmitTransaction(ctx, operon.TransactionRequest{
+		CorrelationID: "corr-missing-did",
+		InteractionID: "intr-injected",
+		Payload:       []byte("payload"),
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "participant DID unavailable on access token")
+	require.Equal(t, int32(0), signCalls.Load())
+	require.Equal(t, int32(0), submitCalls.Load())
 }
 
 func TestClientSubmitTransactionWithSelfSigning(t *testing.T) {

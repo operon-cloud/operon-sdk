@@ -50,17 +50,17 @@ func (c *Client) GenerateSignatureHeaders(ctx context.Context, payload []byte, a
 		return nil, errors.New("automatic signing disabled: enable self signing to generate headers")
 	}
 
+	did := strings.TrimSpace(c.cachedParticipantDID())
+	if did == "" {
+		return nil, errors.New("participant DID unavailable on access token")
+	}
+
 	signature, err := c.signer.Sign(ctx, token, payloadHash, selectedAlgorithm)
 	if err != nil {
 		if errors.Is(err, signing.ErrSigningDisabled) {
 			return nil, errors.New("automatic signing disabled: enable self signing to generate headers")
 		}
 		return nil, err
-	}
-
-	did := strings.TrimSpace(c.cachedParticipantDID())
-	if did == "" {
-		return nil, errors.New("participant DID unavailable on access token")
 	}
 
 	keyID := strings.TrimSpace(signature.KeyID)

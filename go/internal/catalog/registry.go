@@ -46,10 +46,6 @@ type Interaction struct {
 	Type                InteractionType
 	Actor               InteractionActor
 	States              []string
-	FromStateID         string
-	FromStateLabel      string
-	ToStateID           string
-	ToStateLabel        string
 	ROIClassification   ROIClassification
 	ROICost             int
 	ROITime             int

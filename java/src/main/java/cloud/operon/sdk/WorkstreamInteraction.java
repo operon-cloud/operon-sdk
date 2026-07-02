@@ -19,10 +19,6 @@ public record WorkstreamInteraction(
     String type,
     String actor,
     List<String> states,
-    String fromStateId,
-    String fromStateLabel,
-    String toStateId,
-    String toStateLabel,
     String roiClassification,
     Integer roiCost,
     Integer roiTime,
@@ -31,51 +27,4 @@ public record WorkstreamInteraction(
     Instant updatedAt,
     Integer version
 ) {
-    public WorkstreamInteraction(
-        String id,
-        String workstreamId,
-        String workstreamName,
-        String name,
-        String description,
-        String status,
-        String sourceParticipantId,
-        String targetParticipantId,
-        List<String> workstreams,
-        String type,
-        String actor,
-        List<String> states,
-        String roiClassification,
-        Integer roiCost,
-        Integer roiTime,
-        List<String> tags,
-        Instant createdAt,
-        Instant updatedAt,
-        Integer version
-    ) {
-        this(
-            id,
-            workstreamId,
-            workstreamName,
-            name,
-            description,
-            status,
-            sourceParticipantId,
-            targetParticipantId,
-            workstreams,
-            type,
-            actor,
-            states,
-            null,
-            null,
-            null,
-            null,
-            roiClassification,
-            roiCost,
-            roiTime,
-            tags,
-            createdAt,
-            updatedAt,
-            version
-        );
-    }
 }

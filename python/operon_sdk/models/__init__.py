@@ -332,10 +332,6 @@ class InteractionSummary(BaseModel):
     type: str = ""
     actor: str = ""
     states: List[str] = Field(default_factory=list)
-    from_state_id: str = Field(default="", alias="fromStateId")
-    from_state_label: str = Field(default="", alias="fromStateLabel")
-    to_state_id: str = Field(default="", alias="toStateId")
-    to_state_label: str = Field(default="", alias="toStateLabel")
     roi_classification: str = Field(default="", alias="roiClassification")
     roi_cost: int = Field(default=0, alias="roiCost")
     roi_time: int = Field(default=0, alias="roiTime")
@@ -368,10 +364,6 @@ class WorkstreamInteraction(BaseModel):
     type: str = ""
     actor: str = ""
     states: List[str] = Field(default_factory=list)
-    from_state_id: str = Field(default="", alias="fromStateId")
-    from_state_label: str = Field(default="", alias="fromStateLabel")
-    to_state_id: str = Field(default="", alias="toStateId")
-    to_state_label: str = Field(default="", alias="toStateLabel")
     roi_classification: str = Field(default="", alias="roiClassification")
     roi_cost: int = Field(default=0, alias="roiCost")
     roi_time: int = Field(default=0, alias="roiTime")

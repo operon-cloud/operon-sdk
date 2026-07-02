@@ -1,11 +1,18 @@
 package operon
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+type staticTokenProvider struct{}
+
+func (staticTokenProvider) Token(context.Context) (Token, error) {
+	return Token{AccessToken: "injected-token", ExpiresAt: time.Now().Add(time.Minute)}, nil
+}
 
 func TestConfigValidateFillsDefaults(t *testing.T) {
 	cfg := Config{
@@ -31,6 +38,31 @@ func TestConfigValidateRejectsMissingCredentials(t *testing.T) {
 	cfg = Config{ClientID: "client"}
 	err = cfg.Validate()
 	require.Error(t, err)
+}
+
+func TestConfigValidateAcceptsInjectedTokenProviderMode(t *testing.T) {
+	cfg := Config{
+		BaseURL:       "https://example.test/client-api",
+		TokenProvider: staticTokenProvider{},
+	}
+
+	require.NoError(t, cfg.Validate())
+	require.Equal(t, "https://example.test/client-api", cfg.BaseURL)
+	require.Empty(t, cfg.TokenURL)
+	require.Equal(t, defaultTokenLeeway, cfg.TokenLeeway)
+	require.Equal(t, AlgorithmEd25519, cfg.SigningAlgorithm)
+}
+
+func TestConfigValidateRejectsMixedTokenProviderAndClientCredentials(t *testing.T) {
+	cfg := Config{
+		TokenProvider: staticTokenProvider{},
+		ClientID:      "client",
+		ClientSecret:  "secret",
+	}
+
+	err := cfg.Validate()
+	require.Error(t, err)
+	require.ErrorContains(t, err, "TokenProvider cannot be used with ClientID or ClientSecret")
 }
 
 func TestConfigValidateRespectsCustomValues(t *testing.T) {

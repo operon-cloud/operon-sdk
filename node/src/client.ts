@@ -12,7 +12,7 @@ import {
   normalizeTransactionRequestAliases,
   resolvePayload,
   sanitizeOperonHeaders,
-  validateTransactionRequestForSubmit
+  validateTransactionRequestForSubmit,
 } from './transactions.js';
 import {
   buildKeyId,
@@ -29,7 +29,7 @@ import {
   type WorkstreamInteraction,
   type WorkstreamInteractionsResponse,
   type WorkstreamParticipant,
-  type WorkstreamParticipantsResponse
+  type WorkstreamParticipantsResponse,
 } from './types.js';
 
 interface TransactionResponse {
@@ -94,10 +94,6 @@ interface InteractionsResponse {
     type?: string;
     actor?: string;
     states?: string[];
-    fromStateId?: string;
-    fromStateLabel?: string;
-    toStateId?: string;
-    toStateLabel?: string;
     roiClassification?: string;
     roiCost?: number;
     roiTime?: number;
@@ -190,14 +186,14 @@ export class OperonClient {
    */
   async submitTransaction(
     request: TransactionRequest,
-    options: SubmitTransactionOptions = {}
+    options: SubmitTransactionOptions = {},
   ): Promise<Transaction> {
     await this.init(options.signal);
 
     const req: TransactionRequest = {
       ...request,
       tags: request.tags ? [...request.tags] : undefined,
-      signature: request.signature ? { ...request.signature } : undefined
+      signature: request.signature ? { ...request.signature } : undefined,
     };
 
     normalizeTransactionRequestAliases(req);
@@ -212,14 +208,19 @@ export class OperonClient {
 
     validateTransactionRequestForSubmit(req);
 
-    const submission = buildTransactionSubmission(req, signature, payloadHash, req.timestamp ?? new Date());
+    const submission = buildTransactionSubmission(
+      req,
+      signature,
+      payloadHash,
+      req.timestamp ?? new Date(),
+    );
 
     const response = await jsonRequest(this.config, {
       method: 'POST',
       path: '/v1/transactions',
       token: token.accessToken,
       body: submission,
-      signal: options.signal
+      signal: options.signal,
     });
 
     if (response.status >= 400) {
@@ -236,16 +237,17 @@ export class OperonClient {
   async generateSignatureHeaders(
     payload: TransactionPayload,
     algorithm?: string,
-    options: { signal?: AbortSignal } = {}
+    options: { signal?: AbortSignal } = {},
   ): Promise<OperonHeaders> {
     await this.init(options.signal);
 
-    const selectedAlgorithm =
-      algorithm?.trim().length
-        ? canonicalSigningAlgorithm(algorithm)
-        : canonicalSigningAlgorithm(this.config.signingAlgorithm);
+    const selectedAlgorithm = algorithm?.trim().length
+      ? canonicalSigningAlgorithm(algorithm)
+      : canonicalSigningAlgorithm(this.config.signingAlgorithm);
     if (!selectedAlgorithm) {
-      throw new ValidationError(`unsupported signing algorithm ${algorithm ?? this.config.signingAlgorithm}`);
+      throw new ValidationError(
+        `unsupported signing algorithm ${algorithm ?? this.config.signingAlgorithm}`,
+      );
     }
 
     const payloadInput = resolvePayload(payload, undefined);
@@ -255,7 +257,9 @@ export class OperonClient {
 
     const token = await this.tokenValue(options.signal);
     if (!this.selfSigning) {
-      throw new ValidationError('automatic signing disabled: enable self signing to generate headers');
+      throw new ValidationError(
+        'automatic signing disabled: enable self signing to generate headers',
+      );
     }
 
     const did = this.participantDid?.trim();
@@ -267,7 +271,7 @@ export class OperonClient {
       token.accessToken,
       payloadInput.payloadHash,
       selectedAlgorithm,
-      options.signal
+      options.signal,
     );
 
     const signatureValue = signingResult.value?.trim();
@@ -283,7 +287,7 @@ export class OperonClient {
       'X-Operon-Payload-Hash': payloadInput.payloadHash,
       'X-Operon-Signature': signatureValue,
       'X-Operon-Signature-KeyId': keyId,
-      'X-Operon-Signature-Alg': algorithmValue
+      'X-Operon-Signature-Alg': algorithmValue,
     };
   }
 
@@ -293,7 +297,7 @@ export class OperonClient {
   async generateSignatureHeadersFromString(
     payload: string,
     algorithm?: string,
-    options: { signal?: AbortSignal } = {}
+    options: { signal?: AbortSignal } = {},
   ): Promise<OperonHeaders> {
     return this.generateSignatureHeaders(payload, algorithm, options);
   }
@@ -304,7 +308,7 @@ export class OperonClient {
   async validateSignatureHeaders(
     payload: TransactionPayload,
     headers: OperonHeaders,
-    options: { signal?: AbortSignal } = {}
+    options: { signal?: AbortSignal } = {},
   ): Promise<SignatureValidationResult> {
     await this.init(options.signal);
 
@@ -317,7 +321,9 @@ export class OperonClient {
     const computedHash = payloadInput.payloadHash;
     const expectedHash = sanitized[HEADER_OPERON_PAYLOAD_HASH];
     if (computedHash.toLowerCase() !== expectedHash.toLowerCase()) {
-      throw new ValidationError(`payload hash mismatch: expected ${computedHash}, got ${expectedHash}`);
+      throw new ValidationError(
+        `payload hash mismatch: expected ${computedHash}, got ${expectedHash}`,
+      );
     }
 
     const token = await this.tokenValue(options.signal);
@@ -327,7 +333,7 @@ export class OperonClient {
       token.accessToken,
       payloadInput.payloadBytes,
       sanitized,
-      options.signal
+      options.signal,
     );
 
     if (response.status >= 400) {
@@ -341,7 +347,7 @@ export class OperonClient {
       did: body.did,
       payloadHash: body.payloadHash,
       algorithm: body.algorithm,
-      keyId: body.keyId
+      keyId: body.keyId,
     };
   }
 
@@ -351,7 +357,7 @@ export class OperonClient {
   async validateSignatureHeadersFromString(
     payload: string,
     headers: OperonHeaders,
-    options: { signal?: AbortSignal } = {}
+    options: { signal?: AbortSignal } = {},
   ): Promise<SignatureValidationResult> {
     return this.validateSignatureHeaders(payload, headers, options);
   }
@@ -379,7 +385,7 @@ export class OperonClient {
    */
   async getWorkstream(
     workstreamId?: string,
-    options: { signal?: AbortSignal } = {}
+    options: { signal?: AbortSignal } = {},
   ): Promise<Workstream> {
     await this.init(options.signal);
     const token = await this.tokenValue(options.signal);
@@ -389,7 +395,7 @@ export class OperonClient {
       method: 'GET',
       path: `/v1/workstreams/${encodeURIComponent(targetWorkstream)}`,
       token: token.accessToken,
-      signal: options.signal
+      signal: options.signal,
     });
 
     if (response.status >= 400) {
@@ -405,7 +411,7 @@ export class OperonClient {
    */
   async getWorkstreamInteractions(
     workstreamId?: string,
-    options: { signal?: AbortSignal } = {}
+    options: { signal?: AbortSignal } = {},
   ): Promise<WorkstreamInteractionsResponse> {
     await this.init(options.signal);
     const token = await this.tokenValue(options.signal);
@@ -415,7 +421,7 @@ export class OperonClient {
       method: 'GET',
       path: `/v1/workstreams/${encodeURIComponent(targetWorkstream)}/interactions`,
       token: token.accessToken,
-      signal: options.signal
+      signal: options.signal,
     });
 
     if (response.status >= 400) {
@@ -435,7 +441,7 @@ export class OperonClient {
       totalCount: body.totalCount ?? 0,
       page: body.page ?? 0,
       pageSize: body.pageSize ?? 0,
-      hasMore: body.hasMore ?? false
+      hasMore: body.hasMore ?? false,
     };
   }
 
@@ -444,7 +450,7 @@ export class OperonClient {
    */
   async getWorkstreamParticipants(
     workstreamId?: string,
-    options: { signal?: AbortSignal } = {}
+    options: { signal?: AbortSignal } = {},
   ): Promise<WorkstreamParticipantsResponse> {
     await this.init(options.signal);
     const token = await this.tokenValue(options.signal);
@@ -454,7 +460,7 @@ export class OperonClient {
       method: 'GET',
       path: `/v1/workstreams/${encodeURIComponent(targetWorkstream)}/participants`,
       token: token.accessToken,
-      signal: options.signal
+      signal: options.signal,
     });
 
     if (response.status >= 400) {
@@ -474,7 +480,7 @@ export class OperonClient {
       totalCount: body.totalCount ?? 0,
       page: body.page ?? 0,
       pageSize: body.pageSize ?? 0,
-      hasMore: body.hasMore ?? false
+      hasMore: body.hasMore ?? false,
     };
   }
 
@@ -502,7 +508,7 @@ export class OperonClient {
       return this.workstreamId.trim();
     }
     throw new ValidationError(
-      'workstream ID is required: token not scoped to a workstream and no override provided'
+      'workstream ID is required: token not scoped to a workstream and no override provided',
     );
   }
 
@@ -554,9 +560,9 @@ export class OperonClient {
       const response = await this.config.fetchImpl(this.config.sessionHeartbeatUrl, {
         method: 'GET',
         headers: {
-          Authorization: `Bearer ${token.accessToken}`
+          Authorization: `Bearer ${token.accessToken}`,
         },
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       if (response.status === 401) {
@@ -567,7 +573,7 @@ export class OperonClient {
 
       if (response.status >= 400) {
         this.config.logger.warn?.('session heartbeat returned unexpected status', {
-          status: response.status
+          status: response.status,
         });
       }
     } catch (error) {
@@ -583,7 +589,7 @@ export class OperonClient {
 
   private async populateInteractionFields(
     request: TransactionRequest,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<void> {
     normalizeTransactionRequestAliases(request);
 
@@ -641,13 +647,13 @@ export class OperonClient {
   private async resolveSignature(
     token: string,
     request: TransactionRequest,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<Signature> {
     if (request.signature?.value?.trim()) {
       return {
         algorithm: request.signature.algorithm?.trim() || this.config.signingAlgorithm,
         value: request.signature.value.trim(),
-        keyId: request.signature.keyId?.trim() || this.deriveKeyId(request)
+        keyId: request.signature.keyId?.trim() || this.deriveKeyId(request),
       };
     }
 
@@ -659,13 +665,13 @@ export class OperonClient {
       token,
       request.payloadHash!,
       request.signature?.algorithm?.trim() || this.config.signingAlgorithm,
-      signal
+      signal,
     );
 
     return {
       algorithm: signingResult.algorithm,
       value: signingResult.value,
-      keyId: signingResult.keyId ?? this.deriveKeyId(request)
+      keyId: signingResult.keyId ?? this.deriveKeyId(request),
     };
   }
 
@@ -698,7 +704,7 @@ export class OperonClient {
 
     const [interactions, participants] = await Promise.all([
       this.fetchInteractions(token.accessToken, signal),
-      this.fetchParticipants(token.accessToken, signal)
+      this.fetchParticipants(token.accessToken, signal),
     ]);
 
     const participantsMap = new Map<string, string>();
@@ -711,7 +717,7 @@ export class OperonClient {
     const hydratedInteractions = interactions.map((item) => ({
       ...item,
       sourceDid: item.sourceDid ?? participantsMap.get(item.sourceParticipantId),
-      targetDid: item.targetDid ?? participantsMap.get(item.targetParticipantId)
+      targetDid: item.targetDid ?? participantsMap.get(item.targetParticipantId),
     }));
 
     this.registry.replaceInteractions(hydratedInteractions);
@@ -724,7 +730,7 @@ export class OperonClient {
       method: 'GET',
       path: '/v1/interactions',
       token,
-      signal
+      signal,
     });
 
     if (response.status >= 400) {
@@ -750,13 +756,9 @@ export class OperonClient {
         type: item.type,
         actor: item.actor,
         states: Array.isArray(item.states) ? item.states.filter((entry) => !!entry) : undefined,
-        fromStateId: item.fromStateId,
-        fromStateLabel: item.fromStateLabel,
-        toStateId: item.toStateId,
-        toStateLabel: item.toStateLabel,
         roiClassification: item.roiClassification,
         roiCost: item.roiCost,
-        roiTime: item.roiTime
+        roiTime: item.roiTime,
       };
     });
   }
@@ -766,7 +768,7 @@ export class OperonClient {
       method: 'GET',
       path: '/v1/participants',
       token,
-      signal
+      signal,
     });
 
     if (response.status >= 400) {
@@ -785,7 +787,7 @@ export class OperonClient {
         status: item.status,
         customerId: item.customerId,
         workstreamId: firstNonEmpty(item.workstreamId, item.channelId),
-        workstreamName: item.workstreamName
+        workstreamName: item.workstreamName,
       }));
   }
 
@@ -794,7 +796,7 @@ export class OperonClient {
     token: string,
     body: Buffer,
     headers: Record<string, string>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<Response> {
     const url = `${this.config.baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
     const controller = new AbortController();
@@ -805,10 +807,10 @@ export class OperonClient {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          ...headers
+          ...headers,
         },
         body: Uint8Array.from(body),
-        signal: mergeSignals(controller.signal, signal)
+        signal: mergeSignals(controller.signal, signal),
       });
     } catch (error) {
       throw new TransportError(`request POST ${url} failed`, error);
@@ -830,7 +832,7 @@ function deserializeTransaction(response: TransactionResponse): Transaction {
     channelId: workstreamId,
     timestamp: toDate(response.timestamp),
     createdAt: toDate(response.createdAt),
-    updatedAt: toDate(response.updatedAt)
+    updatedAt: toDate(response.updatedAt),
   };
 }
 
@@ -851,7 +853,7 @@ function deserializeWorkstream(payload: Record<string, unknown>): Workstream {
           return {
             id: String(value.id),
             name: String(value.name),
-            status: asString(value.status)
+            status: asString(value.status),
           };
         })
         .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
@@ -875,12 +877,16 @@ function deserializeWorkstream(payload: Record<string, unknown>): Workstream {
     defaultStateId: asString(payload.defaultStateId),
     interactionIds: asStringArray(payload.interactionIds),
     hcsTestTopicId: asString(payload.hcsTestTopicId),
-    hcsLiveTopicId: asString(payload.hcsLiveTopicId)
+    hcsLiveTopicId: asString(payload.hcsLiveTopicId),
   };
 }
 
 function deserializeWorkstreamInteraction(payload: Record<string, unknown>): WorkstreamInteraction {
-  const workstreamId = firstNonEmpty(asString(payload.workstreamId), asString(payload.channelId), '');
+  const workstreamId = firstNonEmpty(
+    asString(payload.workstreamId),
+    asString(payload.channelId),
+    '',
+  );
   return {
     id: String(payload.id ?? ''),
     workstreamId,
@@ -894,17 +900,13 @@ function deserializeWorkstreamInteraction(payload: Record<string, unknown>): Wor
     type: asString(payload.type),
     actor: asString(payload.actor),
     states: asStringArray(payload.states),
-    fromStateId: asString(payload.fromStateId),
-    fromStateLabel: asString(payload.fromStateLabel),
-    toStateId: asString(payload.toStateId),
-    toStateLabel: asString(payload.toStateLabel),
     roiClassification: asString(payload.roiClassification),
     roiCost: asNumber(payload.roiCost),
     roiTime: asNumber(payload.roiTime),
     tags: asStringArray(payload.tags),
     createdAt: toDateOrUndefined(payload.createdAt),
     updatedAt: toDateOrUndefined(payload.updatedAt),
-    version: asNumber(payload.version)
+    version: asNumber(payload.version),
   };
 }
 
@@ -923,7 +925,7 @@ function deserializeWorkstreamParticipant(payload: Record<string, unknown>): Wor
     tags: asStringArray(payload.tags),
     createdAt: toDateOrUndefined(payload.createdAt),
     updatedAt: toDateOrUndefined(payload.updatedAt),
-    version: asNumber(payload.version)
+    version: asNumber(payload.version),
   };
 }
 

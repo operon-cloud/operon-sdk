@@ -40,6 +40,31 @@ if err := client.Init(ctx); err != nil {
 
 `client.Init` proactively mints a Platform Access Token (PAT) and hydrates interaction/participant caches so later calls avoid extra round trips.
 
+### Server-side injected token provider
+
+If your service already mints scoped short-lived PATs, inject a provider instead
+of configuring client credentials:
+
+```go
+client, err := operon.NewClient(operon.Config{
+    BaseURL:       mustEnv("OPERON_CLIENT_API_URL"),
+    TokenProvider: myProvider,
+})
+```
+
+`myProvider` implements:
+
+```go
+type TokenProvider interface {
+    Token(ctx context.Context) (operon.Token, error)
+}
+```
+
+Do not set `ClientID` or `ClientSecret` with `TokenProvider`. The provider owns
+token acquisition and refresh, and should return tokens with enough TTL for a
+full sign-and-submit attempt. The SDK uses the same token for managed
+self-signing and transaction submission within one `SubmitTransaction` call.
+
 ## 3. Prepare the transaction request
 
 ### Minimal submission (recommended starting point)

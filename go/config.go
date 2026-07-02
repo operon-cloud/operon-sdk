@@ -30,6 +30,7 @@ type Config struct {
 	ClientSecret     string
 	Scope            string
 	Audience         []string
+	TokenProvider    TokenProvider
 	HTTPClient       HTTPClient
 	TokenLeeway      time.Duration
 	DisableSelfSign  bool
@@ -57,20 +58,36 @@ func (c *Config) Validate() error {
 	}
 	c.BaseURL = strings.TrimRight(baseURL, "/")
 
-	tokenURL := strings.TrimSpace(c.TokenURL)
-	if tokenURL == "" {
-		tokenURL = DefaultTokenURL
-	}
-	if _, err := url.ParseRequestURI(tokenURL); err != nil {
-		return fmt.Errorf("invalid TokenURL: %w", err)
-	}
-	c.TokenURL = strings.TrimRight(tokenURL, "/")
+	if c.TokenProvider != nil {
+		if strings.TrimSpace(c.ClientID) != "" || strings.TrimSpace(c.ClientSecret) != "" {
+			return errors.New("TokenProvider cannot be used with ClientID or ClientSecret")
+		}
 
-	if strings.TrimSpace(c.ClientID) == "" {
-		return errors.New("ClientID is required")
-	}
-	if strings.TrimSpace(c.ClientSecret) == "" {
-		return errors.New("ClientSecret is required")
+		tokenURL := strings.TrimSpace(c.TokenURL)
+		if tokenURL != "" {
+			if _, err := url.ParseRequestURI(tokenURL); err != nil {
+				return fmt.Errorf("invalid TokenURL: %w", err)
+			}
+			c.TokenURL = strings.TrimRight(tokenURL, "/")
+		} else {
+			c.TokenURL = ""
+		}
+	} else {
+		tokenURL := strings.TrimSpace(c.TokenURL)
+		if tokenURL == "" {
+			tokenURL = DefaultTokenURL
+		}
+		if _, err := url.ParseRequestURI(tokenURL); err != nil {
+			return fmt.Errorf("invalid TokenURL: %w", err)
+		}
+		c.TokenURL = strings.TrimRight(tokenURL, "/")
+
+		if strings.TrimSpace(c.ClientID) == "" {
+			return errors.New("ClientID is required")
+		}
+		if strings.TrimSpace(c.ClientSecret) == "" {
+			return errors.New("ClientSecret is required")
+		}
 	}
 
 	if c.TokenLeeway <= 0 {

@@ -295,26 +295,6 @@ pub struct InteractionSummary {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub states: Vec<String>,
     #[serde(
-        rename = "fromStateId",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub from_state_id: Option<String>,
-    #[serde(
-        rename = "fromStateLabel",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub from_state_label: Option<String>,
-    #[serde(rename = "toStateId", default, skip_serializing_if = "Option::is_none")]
-    pub to_state_id: Option<String>,
-    #[serde(
-        rename = "toStateLabel",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub to_state_label: Option<String>,
-    #[serde(
         rename = "roiClassification",
         default,
         skip_serializing_if = "Option::is_none"
@@ -957,26 +937,6 @@ pub struct WorkstreamInteraction {
     pub actor: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub states: Vec<String>,
-    #[serde(
-        rename = "fromStateId",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub from_state_id: Option<String>,
-    #[serde(
-        rename = "fromStateLabel",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub from_state_label: Option<String>,
-    #[serde(rename = "toStateId", default, skip_serializing_if = "Option::is_none")]
-    pub to_state_id: Option<String>,
-    #[serde(
-        rename = "toStateLabel",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub to_state_label: Option<String>,
     #[serde(
         rename = "roiClassification",
         default,

@@ -14,10 +14,6 @@ export interface InteractionMetadata {
   type?: string;
   actor?: string;
   states?: string[];
-  fromStateId?: string;
-  fromStateLabel?: string;
-  toStateId?: string;
-  toStateLabel?: string;
   roiClassification?: string;
   roiCost?: number;
   roiTime?: number;
@@ -48,7 +44,7 @@ export class Registry {
       }
       this.interactions.set(item.id, {
         ...item,
-        states: item.states ? [...item.states] : undefined
+        states: item.states ? [...item.states] : undefined,
       });
     }
   }
@@ -68,7 +64,7 @@ export class Registry {
     return metadata
       ? {
           ...metadata,
-          states: metadata.states ? [...metadata.states] : undefined
+          states: metadata.states ? [...metadata.states] : undefined,
         }
       : undefined;
   }
@@ -89,13 +85,9 @@ export class Registry {
       type: item.type,
       actor: item.actor,
       states: item.states ? [...item.states] : undefined,
-      fromStateId: item.fromStateId,
-      fromStateLabel: item.fromStateLabel,
-      toStateId: item.toStateId,
-      toStateLabel: item.toStateLabel,
       roiClassification: item.roiClassification,
       roiCost: item.roiCost,
-      roiTime: item.roiTime
+      roiTime: item.roiTime,
     }));
   }
 
@@ -108,7 +100,7 @@ export class Registry {
       customerId: item.customerId,
       workstreamId: item.workstreamId,
       channelId: item.workstreamId,
-      workstreamName: item.workstreamName
+      workstreamName: item.workstreamName,
     }));
   }
 }

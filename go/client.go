@@ -41,18 +41,20 @@ type Client struct {
 	referenceMu     sync.Mutex
 	referenceLoaded bool
 
-	participantMu  sync.RWMutex
-	participantDID string
-	workstreamID   string
-	customerID     string
-	workspaceID    string
-	email          string
-	name           string
-	tenantIDs      []string
-	roles          []string
-	memberID       string
-	sessionID      string
-	orgID          string
+	participantMu   sync.RWMutex
+	participantDID  string
+	participantID   string
+	participantName string
+	workstreamID    string
+	customerID      string
+	workspaceID     string
+	email           string
+	name            string
+	tenantIDs       []string
+	roles           []string
+	memberID        string
+	sessionID       string
+	orgID           string
 }
 
 // NewClient constructs a new Client instance using the supplied configuration.
@@ -67,17 +69,25 @@ func NewClient(cfg Config) (*Client, error) {
 		httpClient = &http.Client{Timeout: DefaultHTTPTimeout}
 	}
 
-	tokenProvider, err := auth.NewClientCredentialsManager(auth.ClientCredentialsConfig{
-		TokenURL:     cfgCopy.TokenURL,
-		ClientID:     cfgCopy.ClientID,
-		ClientSecret: cfgCopy.ClientSecret,
-		Scope:        cfgCopy.Scope,
-		Audience:     cfgCopy.Audience,
-		HTTPClient:   httpClient,
-		Leeway:       cfgCopy.TokenLeeway,
-	})
-	if err != nil {
-		return nil, err
+	var (
+		tokenProvider auth.Provider
+		err           error
+	)
+	if cfgCopy.TokenProvider != nil {
+		tokenProvider = tokenProviderAdapter{provider: cfgCopy.TokenProvider}
+	} else {
+		tokenProvider, err = auth.NewClientCredentialsManager(auth.ClientCredentialsConfig{
+			TokenURL:     cfgCopy.TokenURL,
+			ClientID:     cfgCopy.ClientID,
+			ClientSecret: cfgCopy.ClientSecret,
+			Scope:        cfgCopy.Scope,
+			Audience:     cfgCopy.Audience,
+			HTTPClient:   httpClient,
+			Leeway:       cfgCopy.TokenLeeway,
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var signer signing.Signer = signing.DisabledSigner{}
@@ -144,6 +154,12 @@ func (c *Client) tokenValue(ctx context.Context) (string, error) {
 	c.participantMu.Lock()
 	if did := strings.TrimSpace(token.ParticipantDID); did != "" {
 		c.participantDID = did
+	}
+	if participantID := strings.TrimSpace(token.ParticipantID); participantID != "" {
+		c.participantID = participantID
+	}
+	if participantName := strings.TrimSpace(token.ParticipantName); participantName != "" {
+		c.participantName = participantName
 	}
 	if workstream := strings.TrimSpace(token.WorkstreamID); workstream != "" {
 		c.workstreamID = workstream
