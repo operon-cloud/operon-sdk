@@ -35,7 +35,8 @@ func TestClientGetWorkstreamUsesTokenWorkstream(t *testing.T) {
 				Status:      operon.WorkstreamStatusActive,
 				Mode:        operon.WorkstreamModeOn,
 				States: []operon.WorkstreamState{
-					{ID: "state-1", Name: "Intake", Status: operon.WorkstreamStateStatusActive},
+					{ID: "state-1", Name: "Intake", Status: operon.WorkstreamStateStatusActive, SourceCode: "intake", SLAClockStart: true},
+					{ID: "state-2", Name: "Closed", Status: operon.WorkstreamStateStatusInactive, SourceCode: "closed", SLAClockStop: true},
 				},
 				DefaultStateID: "state-1",
 				CreatedAt:      time.Now().UTC(),
@@ -58,7 +59,11 @@ func TestClientGetWorkstreamUsesTokenWorkstream(t *testing.T) {
 	require.NotNil(t, workstream)
 	require.Equal(t, "wstr-abc", workstream.ID)
 	require.Equal(t, operon.WorkstreamStatusActive, workstream.Status)
-	require.Len(t, workstream.States, 1)
+	require.Len(t, workstream.States, 2)
+	require.Equal(t, "intake", workstream.States[0].SourceCode)
+	require.True(t, workstream.States[0].SLAClockStart)
+	require.Equal(t, "closed", workstream.States[1].SourceCode)
+	require.True(t, workstream.States[1].SLAClockStop)
 }
 
 func TestClientGetWorkstreamAllowsOverride(t *testing.T) {

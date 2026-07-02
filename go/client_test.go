@@ -37,6 +37,8 @@ type transactionSubmission struct {
 	ROICostSaving               int              `json:"roiCostSaving,omitempty"`
 	ROITimeSaving               int              `json:"roiTimeSaving,omitempty"`
 	ActiveTimeSeconds           *int             `json:"activeTimeSeconds,omitempty"`
+	StateID                     string           `json:"stateId,omitempty"`
+	StateLabel                  string           `json:"stateLabel,omitempty"`
 	PayloadHash                 string           `json:"payloadHash"`
 	Signature                   operon.Signature `json:"signature"`
 	Tags                        []string         `json:"tags,omitempty"`
@@ -165,6 +167,10 @@ func TestClientSubmitTransactionWithInjectedTokenProvider(t *testing.T) {
 			var bodyMap map[string]any
 			require.NoError(t, json.Unmarshal(body, &bodyMap))
 			require.NotContains(t, bodyMap, "payloadData")
+			require.NotContains(t, bodyMap, "sourceCode")
+			require.NotContains(t, bodyMap, "stateSourceCode")
+			require.NotContains(t, bodyMap, "stateId")
+			require.NotContains(t, bodyMap, "stateLabel")
 			require.NoError(t, json.Unmarshal(body, &captured))
 
 			now := time.Now().UTC()
@@ -499,9 +505,18 @@ func TestClientSubmitTransactionWithManualSignature(t *testing.T) {
 			}
 			require.NoError(t, json.NewEncoder(w).Encode(payload))
 		case "/v1/transactions":
+			bodyBytes, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			var bodyMap map[string]any
+			require.NoError(t, json.Unmarshal(bodyBytes, &bodyMap))
+			require.NotContains(t, bodyMap, "sourceCode")
+			require.NotContains(t, bodyMap, "stateSourceCode")
+
 			var body transactionSubmission
-			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			require.NoError(t, json.Unmarshal(bodyBytes, &body))
 			require.Equal(t, "manual-signature", body.Signature.Value)
+			require.Equal(t, "stat-review", body.StateID)
+			require.Empty(t, body.StateLabel)
 			require.Equal(t, 15, body.ROIBaseCost)
 			require.Equal(t, 7, body.ROIBaseTime)
 			require.Equal(t, 4, body.ROICostSaving)
@@ -515,7 +530,7 @@ func TestClientSubmitTransactionWithManualSignature(t *testing.T) {
 			require.Equal(t, "cust-1", body.CustomerID)
 			require.Equal(t, "wksp-1", body.WorkspaceID)
 			require.Equal(t, "user-1", body.CreatedBy)
-			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "txn-456", "status": "received", "correlationId": body.CorrelationID, "workstreamId": body.WorkstreamID, "interactionId": body.InteractionID, "sourceDid": body.SourceDID, "targetDid": body.TargetDID, "timestamp": time.Now(), "createdAt": time.Now(), "updatedAt": time.Now(), "signature": map[string]any{"algorithm": body.Signature.Algorithm, "value": body.Signature.Value}}))
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": "txn-456", "status": "received", "correlationId": body.CorrelationID, "workstreamId": body.WorkstreamID, "interactionId": body.InteractionID, "sourceDid": body.SourceDID, "targetDid": body.TargetDID, "stateId": body.StateID, "stateLabel": "Review", "timestamp": time.Now(), "createdAt": time.Now(), "updatedAt": time.Now(), "signature": map[string]any{"algorithm": body.Signature.Algorithm, "value": body.Signature.Value}}))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
@@ -533,6 +548,7 @@ func TestClientSubmitTransactionWithManualSignature(t *testing.T) {
 		InteractionID: "manual-interaction",
 		SourceDID:     "did:example:source",
 		TargetDID:     "did:example:target",
+		StateID:       "stat-review",
 		Payload:       []byte("payload"),
 		Signature: operon.Signature{
 			Algorithm: operon.AlgorithmEd25519,
@@ -557,6 +573,8 @@ func TestClientSubmitTransactionWithManualSignature(t *testing.T) {
 	txn, err := client.SubmitTransaction(ctx, req)
 	require.NoError(t, err)
 	require.Equal(t, "txn-456", txn.ID)
+	require.Equal(t, "stat-review", txn.StateID)
+	require.Equal(t, "Review", txn.StateLabel)
 }
 
 func TestGenerateSignatureHeadersUsesDefaultAlgorithm(t *testing.T) {

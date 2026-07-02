@@ -188,9 +188,74 @@ type Workstream struct {
 
 // WorkstreamState represents a user-managed transaction state within a workstream.
 type WorkstreamState struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Status string `json:"status,omitempty"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Status        string `json:"status,omitempty"`
+	SourceCode    string `json:"sourceCode,omitempty"`
+	SLAClockStart bool   `json:"slaClockStart,omitempty"`
+	SLAClockStop  bool   `json:"slaClockStop,omitempty"`
+}
+
+// FindState returns the state whose ID matches the supplied value.
+func (w *Workstream) FindState(id string) *WorkstreamState {
+	return w.findStateBy(id, func(state WorkstreamState) string {
+		return state.ID
+	})
+}
+
+// FindStateByName returns the first state whose name matches the supplied value.
+func (w *Workstream) FindStateByName(name string) *WorkstreamState {
+	return w.findStateBy(name, func(state WorkstreamState) string {
+		return state.Name
+	})
+}
+
+// FindStateBySourceCode returns the state whose upstream source code matches the supplied value.
+func (w *Workstream) FindStateBySourceCode(sourceCode string) *WorkstreamState {
+	return w.findStateBy(sourceCode, func(state WorkstreamState) string {
+		return state.SourceCode
+	})
+}
+
+// DefaultState returns the configured default state, or nil when the default ID is blank or missing.
+func (w *Workstream) DefaultState() *WorkstreamState {
+	if w == nil {
+		return nil
+	}
+	return w.FindState(w.DefaultStateID)
+}
+
+// ActiveStates returns active states in Workstream order.
+func (w *Workstream) ActiveStates() []WorkstreamState {
+	if w == nil {
+		return nil
+	}
+
+	active := make([]WorkstreamState, 0, len(w.States))
+	for _, state := range w.States {
+		if strings.EqualFold(strings.TrimSpace(state.Status), WorkstreamStateStatusActive) {
+			active = append(active, state)
+		}
+	}
+	return active
+}
+
+func (w *Workstream) findStateBy(value string, selector func(WorkstreamState) string) *WorkstreamState {
+	if w == nil {
+		return nil
+	}
+
+	needle := strings.TrimSpace(value)
+	if needle == "" {
+		return nil
+	}
+
+	for i := range w.States {
+		if strings.EqualFold(strings.TrimSpace(selector(w.States[i])), needle) {
+			return &w.States[i]
+		}
+	}
+	return nil
 }
 
 // WorkstreamStatus describes the lifecycle status of a workstream.

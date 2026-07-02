@@ -191,3 +191,83 @@ func TestTransactionUnmarshalIncludesExternalAndLegacyROIFields(t *testing.T) {
 	require.Equal(t, "Assignee One", txn.AssigneeExternalDisplayName)
 	require.Equal(t, "crm", txn.AssigneeExternalSource)
 }
+
+func TestWorkstreamStateCatalogDecodeAndLookupHelpers(t *testing.T) {
+	raw := []byte(`{
+		"id":"wstr-raed",
+		"customerId":"cust-1",
+		"workspaceId":"wksp-1",
+		"name":"RAED",
+		"status":"active",
+		"mode":"on",
+		"defaultStateId":"stat-default",
+		"states":[
+			{
+				"id":"stat-default",
+				"name":"Converted",
+				"status":"active",
+				"sourceCode":"converted",
+				"slaClockStart":true
+			},
+			{
+				"id":"stat-closed",
+				"name":"Closed",
+				"status":"inactive",
+				"sourceCode":"closed",
+				"slaClockStop":true
+			}
+		]
+	}`)
+
+	var workstream Workstream
+	require.NoError(t, json.Unmarshal(raw, &workstream))
+	require.Equal(t, "stat-default", workstream.DefaultStateID)
+	require.Len(t, workstream.States, 2)
+	require.Equal(t, "converted", workstream.States[0].SourceCode)
+	require.True(t, workstream.States[0].SLAClockStart)
+	require.False(t, workstream.States[0].SLAClockStop)
+	require.Equal(t, "closed", workstream.States[1].SourceCode)
+	require.False(t, workstream.States[1].SLAClockStart)
+	require.True(t, workstream.States[1].SLAClockStop)
+
+	require.Equal(t, "Converted", workstream.FindState(" STAT-DEFAULT ").Name)
+	require.Equal(t, "Converted", workstream.FindStateByName(" converted ").Name)
+	require.Equal(t, "Converted", workstream.FindStateBySourceCode(" CONVERTED ").Name)
+	require.Equal(t, "Converted", workstream.DefaultState().Name)
+
+	active := workstream.ActiveStates()
+	require.Len(t, active, 1)
+	require.Equal(t, "stat-default", active[0].ID)
+	active[0].Name = "mutated"
+	require.Equal(t, "Converted", workstream.States[0].Name)
+}
+
+func TestWorkstreamStateLookupHelpersHandleMissingInputs(t *testing.T) {
+	var nilWorkstream *Workstream
+	require.Nil(t, nilWorkstream.FindState("state-1"))
+	require.Nil(t, nilWorkstream.FindStateByName("Queued"))
+	require.Nil(t, nilWorkstream.FindStateBySourceCode("queued"))
+	require.Nil(t, nilWorkstream.DefaultState())
+	require.Empty(t, nilWorkstream.ActiveStates())
+
+	workstream := &Workstream{
+		DefaultStateID: "missing-default",
+		States: []WorkstreamState{
+			{ID: "state-1", Name: "Queued", Status: WorkstreamStateStatusInactive, SourceCode: "queued"},
+			{ID: "state-2", Name: "Review", Status: " Active ", SourceCode: "review"},
+		},
+	}
+
+	require.Nil(t, workstream.FindState(""))
+	require.Nil(t, workstream.FindState("   "))
+	require.Nil(t, workstream.FindState("missing"))
+	require.Nil(t, workstream.FindStateByName(""))
+	require.Nil(t, workstream.FindStateByName("missing"))
+	require.Nil(t, workstream.FindStateBySourceCode(""))
+	require.Nil(t, workstream.FindStateBySourceCode("missing"))
+	require.Nil(t, workstream.DefaultState())
+
+	active := workstream.ActiveStates()
+	require.Len(t, active, 1)
+	require.Equal(t, "state-2", active[0].ID)
+}
